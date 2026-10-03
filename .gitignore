@@ -1,0 +1,13 @@
+node_modules/
+.output/
+.wxt/
+coverage/
+*.log
+.DS_Store
+
+# Real PDFs for manual checks (may be copyrighted; never commit them)
+tests/fixtures/local/*
+!tests/fixtures/local/.gitkeep
+
+# Phase 6 eval secrets and outputs
+.env

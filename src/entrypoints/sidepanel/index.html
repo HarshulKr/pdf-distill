@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Distill</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="app-header">
+        <h1>PDF Distill</h1>
+        <p class="tagline">PDF to clean Markdown, locally. Nothing is uploaded.</p>
+      </header>
+
+      <label id="drop-zone" class="drop-zone" for="file-input" tabindex="0">
+        <input id="file-input" type="file" accept="application/pdf,.pdf" hidden />
+        <span class="drop-title">Drop a PDF here</span>
+        <span class="drop-sub">or click to choose a file</span>
+      </label>
+
+      <section id="file-info" class="file-info" hidden aria-live="polite"></section>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
