@@ -36,6 +36,12 @@
   box-sizing: border-box;
 }
 
+/* Components below set display:flex, which would otherwise override the
+   hidden attribute. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -93,15 +99,231 @@ body {
   font-size: 0.85rem;
 }
 
-.file-info {
-  padding: 10px 12px;
+:root {
+  --warn: #8a5a00;
+  --warn-bg: #fff4dc;
+  --danger-bg: #fdecea;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --warn: #f3c969;
+    --warn-bg: #3a2f17;
+    --danger-bg: #3c2120;
+  }
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
   word-break: break-word;
 }
 
-.file-info.error {
+.notice.error {
   color: var(--danger);
-  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.notice.warn {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.doc-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.doc-titles {
+  min-width: 0;
+}
+
+.doc-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.doc-head p {
+  margin: 2px 0 0;
+}
+
+#count-status {
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-weight: 600;
+}
+
+input[type='text'],
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+input[type='text']:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.check input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+button {
+  font: inherit;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.link-button {
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+  flex-shrink: 0;
+}
+
+.progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--accent);
+}
+
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stats p {
+  margin: 0;
+}
+
+.stat-main {
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-after {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.warnings {
+  margin: 0;
+  padding: 10px 12px 10px 28px;
+  border-radius: var(--radius);
+  color: var(--warn);
+  background: var(--warn-bg);
+  font-size: 0.9rem;
+}
+
+.warnings li + li {
+  margin-top: 4px;
+}
+
+#preview {
+  min-height: 320px;
+  resize: vertical;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+footer {
+  text-align: center;
+  padding-bottom: 8px;
 }

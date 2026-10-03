@@ -6,10 +6,13 @@
 /** One positioned run of text from pdf.js, normalised so y grows downward. */
 export interface TextItem {
   str: string;
+  /** Left edge, in PDF points from the left of the page. */
   x: number;
+  /** Baseline, in PDF points from the top of the page. */
   y: number;
   width: number;
   height: number;
+  /** Real font name when pdf.js exposes it (e.g. "Helvetica-Bold"), else pdf.js's internal id. */
   fontName: string;
   /** Derived from the pdf.js transform matrix. */
   fontSize: number;
@@ -17,15 +20,35 @@ export interface TextItem {
   page: number;
 }
 
+/** Extracted content of one page, before any interpretation. */
+export interface PageContent {
+  page: number;
+  width: number;
+  height: number;
+  items: TextItem[];
+}
+
 /** Items on the same page and baseline, joined left to right. */
 export interface Line {
   page: number;
+  /** Baseline, from the top of the page. */
   y: number;
+  /** Left edge. */
   x: number;
+  /** Horizontal extent from x to the end of the last item. */
+  width: number;
   text: string;
   fontSize: number;
   bold: boolean;
   items: TextItem[];
+}
+
+/** Lines of one page, top to bottom. */
+export interface PageLines {
+  page: number;
+  width: number;
+  height: number;
+  lines: Line[];
 }
 
 export type Block =
@@ -43,10 +66,17 @@ export interface Section {
 }
 
 export interface ConversionStats {
+  /** Number of pages converted. */
   pages: number;
-  charsBefore: number;
+  /**
+   * "Before" numbers describe the WHOLE document. They are null while the
+   * background whole-document count is still running.
+   */
+  charsBefore: number | null;
+  tokensBefore: number | null;
+  /** Rough estimate of uploading the whole PDF (text + one image per page). */
+  rawUploadTokensBefore: number | null;
   charsAfter: number;
-  tokensBefore: number;
   tokensAfter: number;
   removedLines: number;
 }

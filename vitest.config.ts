@@ -12,7 +12,7 @@ export default defineConfig({
       // Coverage is reported for the pure core only (spec: "Report test
       // coverage for src/core/"). UI and Chrome glue are tested manually.
       include: ['src/core/**/*.ts'],
-      exclude: ['src/core/**/*.test.ts'],
+      exclude: ['src/core/**/*.test.ts', 'src/core/testing.ts'],
       reporter: ['text', 'html'],
     },
   },

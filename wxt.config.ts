@@ -1,4 +1,10 @@
+import { readdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { defineConfig } from 'wxt';
+
+const require = createRequire(import.meta.url);
+const pdfjsRoot = dirname(require.resolve('pdfjs-dist/package.json'));
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -17,6 +23,17 @@ export default defineConfig({
     // compiling bundled .wasm files only; it does not allow eval() of JS.
     content_security_policy: {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+    },
+  },
+  hooks: {
+    // Bundle pdf.js character maps (~1.7 MB). Some PDFs, notably CJK ones,
+    // use predefined CMaps; without them pdf.js cannot map glyphs to text.
+    // MV3 forbids loading them from a CDN, so they ship inside the extension.
+    'build:publicAssets': (_wxt, files) => {
+      const cmapDir = join(pdfjsRoot, 'cmaps');
+      for (const name of readdirSync(cmapDir)) {
+        files.push({ absoluteSrc: join(cmapDir, name), relativeDest: `pdfjs/cmaps/${name}` });
+      }
     },
   },
 });

@@ -10,7 +10,7 @@
     <main class="app">
       <header class="app-header">
         <h1>PDF Distill</h1>
-        <p class="tagline">PDF to clean Markdown, locally. Nothing is uploaded.</p>
+        <p class="tagline">PDF to clean Markdown, locally. Your document never leaves this computer.</p>
       </header>
 
       <label id="drop-zone" class="drop-zone" for="file-input" tabindex="0">
@@ -19,7 +19,67 @@
         <span class="drop-sub">or click to choose a file</span>
       </label>
 
-      <section id="file-info" class="file-info" hidden aria-live="polite"></section>
+      <div id="error" class="notice error" role="alert" hidden></div>
+
+      <section id="doc" class="card" hidden>
+        <div class="doc-head">
+          <div class="doc-titles">
+            <h2 id="doc-title"></h2>
+            <p id="doc-meta" class="muted"></p>
+          </div>
+          <button id="change-file" class="link-button" type="button">Change file</button>
+        </div>
+        <p id="large-warning" class="notice warn" hidden></p>
+        <p id="count-status" class="muted small" aria-live="polite"></p>
+
+        <div class="field">
+          <label for="range">Pages</label>
+          <input id="range" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 45-70, 82 (empty = all pages)" />
+          <p id="range-error" class="field-error" hidden></p>
+        </div>
+
+        <label class="check">
+          <input id="page-markers" type="checkbox" checked />
+          <span>Include page markers <span class="muted">(lets the AI cite pages)</span></span>
+        </label>
+
+        <div class="actions">
+          <button id="convert" class="primary" type="button">Convert</button>
+          <button id="cancel" type="button" hidden>Cancel</button>
+        </div>
+
+        <div id="progress-wrap" class="progress-wrap" hidden>
+          <progress id="progress" max="1" value="0"></progress>
+          <span id="progress-label" class="muted small"></span>
+        </div>
+      </section>
+
+      <section id="result" class="card" hidden>
+        <div class="stats">
+          <p class="stat-main">
+            <span id="tokens-before">…</span>
+            <span aria-hidden="true">→</span>
+            <span id="tokens-after" class="stat-after"></span>
+            <span class="muted small">tokens (est.)</span>
+          </p>
+          <p id="stats-detail" class="muted small"></p>
+        </div>
+
+        <ul id="warnings" class="warnings" hidden></ul>
+
+        <label for="preview" class="sr-only">Markdown preview</label>
+        <textarea id="preview" spellcheck="false"></textarea>
+
+        <div class="actions">
+          <button id="copy" class="primary" type="button">Copy</button>
+          <button id="download" type="button">Download .md</button>
+          <span id="copy-status" class="muted small" aria-live="polite"></span>
+        </div>
+      </section>
+
+      <footer class="muted small">
+        Token numbers are estimates, not exact Claude counts.
+      </footer>
     </main>
     <script type="module" src="./main.ts"></script>
   </body>
