@@ -1,7 +1,7 @@
 // Node-side helpers: open a PDF with pdf.js's legacy (Node) build and run the
 // same extraction + conversion code the extension uses.
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type { PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api';
 import { convert, type ConvertOptions } from '../../src/core/convert';
@@ -42,7 +42,7 @@ export async function convertPdf(
     const sample = samplePages(parsed.pages, doc.numPages);
     const pages = await extractPages(doc, sample, { fonts: true });
     const whole = await countDocumentText(doc);
-    return convert({ pages, selected: parsed.pages, options, fileName: path.split('/').pop() ?? 'doc.pdf', wholeDocument: whole });
+    return convert({ pages, selected: parsed.pages, options, fileName: basename(path), wholeDocument: whole });
   } finally {
     await close();
   }

@@ -1,0 +1,4 @@
+# Keep LF everywhere so golden Markdown files compare equal on Windows.
+* text=auto eol=lf
+*.pdf binary
+*.png binary
