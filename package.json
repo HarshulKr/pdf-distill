@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "fixtures": "tsx scripts/make-fixtures.ts",
-    "convert": "tsx scripts/convert.ts"
+    "convert": "tsx scripts/convert.ts",
+    "eval": "tsx --env-file-if-exists=.env scripts/eval.ts"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "1.0.0",
@@ -24,6 +25,7 @@
     "tesseract.js": "7.0.0"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "0.131.0",
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.5",
     "@vitest/coverage-v8": "5.0.3",

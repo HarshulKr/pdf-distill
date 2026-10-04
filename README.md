@@ -2,7 +2,7 @@
 
 A Chrome extension that converts PDFs into clean, compact Markdown **locally in your browser**. Keep only the part you need (a chapter, a page range, or the sections relevant to your question), see a before/after token estimate, and paste the result into Claude, ChatGPT or another AI chat.
 
-> **Status: Phase 5 in testing.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed, reads scanned pages with on-device OCR, and inserts the result into Claude or ChatGPT. See [Roadmap](#roadmap).
+> **Status: Phase 5 done; Phase 6 in progress.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed, reads scanned pages with on-device OCR, and inserts the result into Claude or ChatGPT. See [Roadmap](#roadmap).
 
 ## Why
 
@@ -81,7 +81,8 @@ npm run convert -- tests/fixtures/local/scan.pdf "" --ocr   # OCR scanned pages
 | `npm test` | Unit tests (Vitest) |
 | `npm run coverage` | Tests with coverage for `src/core/` |
 | `npm run fixtures` | Regenerate test PDFs in `tests/fixtures/` |
-| `npm run convert -- <pdf> [pages]` | Convert a PDF from the command line |
+| `npm run convert -- <pdf> [pages] [--ocr]` | Convert a PDF from the command line |
+| `npm run eval` | Measure exact Claude token counts on real PDFs (needs an API key in `.env`; see `eval/`) |
 
 Golden Markdown files in `tests/golden/` are only rewritten deliberately: `UPDATE_GOLDEN=1 npm test`.
 
@@ -146,7 +147,7 @@ Known non-goals: perfect table and math reconstruction, understanding images/dia
 - [x] Phase 2: chapters and structure quality
 - ~~Phase 3: question-aware trimming~~ (dropped: not worth the complexity for this tool)
 - [x] Phase 4: OCR for scanned pages
-- [ ] Phase 5: insert into Claude / ChatGPT (built; awaiting a check on the live sites)
+- [x] Phase 5: insert into Claude / ChatGPT (checked on both live sites)
 - [ ] Phase 6: evaluation with exact token counts
 
 ## Eval results
