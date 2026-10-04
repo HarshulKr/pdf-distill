@@ -184,7 +184,9 @@ const SENTENCE_END_RE = /[.!?:;"”’')\]]$/;
 export function startsParagraph(prev: Line, line: Line, profile: DocumentProfile): boolean {
   const gap = line.y - prev.y;
   if (gap > PARAGRAPH_GAP_RATIO * profile.lineGap) return true;
-  if (gap < 0) return true; // went back up: a new column or float
+  // Went back up: a new column (or a float). A sentence cut off at the
+  // bottom of the left column continues in lowercase at the top of the right.
+  if (gap < 0) return SENTENCE_END_RE.test(prev.text) || !/^[a-z]/.test(line.text);
   if (line.x - prev.x > INDENT_EMS * line.fontSize) return true;
   if (SENTENCE_END_RE.test(prev.text) && prev.width < SHORT_LINE_RATIO * profile.lineWidth) return true;
   return false;

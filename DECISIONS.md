@@ -195,3 +195,12 @@ All three arXiv papers supplied for testing are single-column. Column reading or
 
 ### D41. Private Use Area characters are dropped
 TeX math fonts draw large brackets from Private Use Area code points (U+E000-U+F8FF), which come out as garbage characters. They never carry meaning as text, so extraction drops them.
+
+### D42. Multi-column pages (supersedes D40)
+`layout/columns.ts`, tested on a scanned and OCR'd two-column IEEE paper (pages 1-4 of the PDF), AIMA's three-column bibliography, and every single-column PDF used so far.
+- **Gutters:** x ranges between the leftmost and rightmost body text, in the central 70% of the page, at least 1 em wide, that ≤5% of body-size items cross. Gutters that would leave a column narrower than 12 em are dropped: in OCR'd or justified text, word gaps can line up by chance inside a real column.
+- **Columns must be running text.** In each column, at least 5 lines, and at least 40% of its lines, must fill ≥60% of the column width with *text*: ≥4 words, ≥60% letters, ≥3 letters per word on average. This was the key rule. The first version only checked line length, and split ATLAS's Table 7, a page of CS229 equations, an appendix heading and AIMA's contents page (dot leaders) as if they were columns. A first fix used "sentence-like" lines (lowercase words) and then rejected bibliographies, which are mostly names.
+- **Reading order:** items crossing a gutter (titles, wide figures) form spanning lines that split the page into bands; within a band each column is read top to bottom, left to right.
+- **Paragraphs across columns:** moving up the page used to always start a new paragraph. A sentence cut off at the bottom of a column now continues when the next column starts in lowercase.
+- **Results:** IEEE paper pages 1-4 detected (plus a multi-column committee list), AIMA bibliography (pp. 1085-1118, three columns) reads entry by entry. Zero pages detected in ATLAS, CS229, the two short papers, the slides and the scan; their outputs are byte-identical to before.
+- **Limitation:** index pages (short entries like "A* search, 103") are not recognised as columns and stay interleaved.

@@ -106,8 +106,13 @@ describe('startsParagraph', () => {
     const short = line('End of paragraph.', { y: 100, width: 120 });
     expect(startsParagraph(short, line('Next one', { y: 115 }), profile)).toBe(true);
   });
-  it('yes: moved back up the page', () => {
-    expect(startsParagraph(prev, line('top of column', { y: 50 }), profile)).toBe(true);
+  it('yes: moved back up the page (next column) at a sentence or capital', () => {
+    expect(startsParagraph(prev, line('Top of the next column', { y: 50, x: 308 }), profile)).toBe(true);
+    const ended = line('a full line that ends a sentence.', { y: 100 });
+    expect(startsParagraph(ended, line('lowercase start', { y: 50, x: 308 }), profile)).toBe(true);
+  });
+  it('no: a sentence cut off at the bottom of a column continues at the top of the next', () => {
+    expect(startsParagraph(prev, line('continues in the right column', { y: 50, x: 308 }), profile)).toBe(false);
   });
 });
 

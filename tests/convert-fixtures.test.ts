@@ -105,9 +105,13 @@ describe('warnings', () => {
     expect(warnings[0]).toMatch(/^Page 2 has no readable text/);
   });
 
-  it('flags two-column pages instead of failing silently', async () => {
-    const { warnings } = await convertFixture('two-column.pdf');
-    expect(warnings).toEqual([expect.stringMatching(/^Page 1 seems to have columns or a table/)]);
+  it('reads a two-column page left column first, without a warning', async () => {
+    const { markdown, warnings } = await convertFixture('two-column.pdf');
+    expect(warnings).toEqual([]);
+    const order = ['LEFT COLUMN START', 'LEFT COLUMN END', 'RIGHT COLUMN START', 'RIGHT COLUMN END'].map((m) => markdown.indexOf(m));
+    expect(order.every((pos) => pos >= 0)).toBe(true);
+    expect([...order].sort((x, y) => x - y)).toEqual(order);
+    expect(markdown).toContain('# Membrane Transport in Brief');
   });
 });
 

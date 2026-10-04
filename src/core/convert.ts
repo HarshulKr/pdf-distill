@@ -7,6 +7,7 @@ import { LOW_TEXT_CHARS } from './extract/extract';
 import { removeFigureLabels } from './clean/figures';
 import { findFolioOffsets, findRunningLines, removeHeadersAndFooters } from './clean/headers';
 import { removeMarginNotes } from './layout/margins';
+import { pageToColumnLines } from './layout/columns';
 import { looksMultiColumn, pageToLines } from './layout/lines';
 import { renderMarkdown } from './markdown/render';
 import { sectionsInSelection } from './outline/outline';
@@ -107,7 +108,7 @@ export function convert(input: ConvertInput): ConversionResult {
   const marginNotes = margins.pages
     .filter(isSelected)
     .reduce((n, p) => n + (itemsBefore.get(p.page) ?? 0) - p.items.length, 0);
-  const allLines = margins.pages.map(pageToLines);
+  const allLines = margins.pages.map(pageToColumnLines);
 
   // Header/footer detection and the profile use the whole sample.
   const running = findRunningLines(allLines);
