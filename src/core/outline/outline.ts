@@ -96,7 +96,22 @@ export async function sectionsFromOutline(doc: PdfOutlineDocLike): Promise<Secti
     }
   };
   await walk(outline, 1);
+  if (looksLikeFileNames(entries.map((e) => e.title))) return [];
   return sectionsFromEntries(entries, doc.numPages);
+}
+
+/** "IMG_0001", "Scan 12", "Page 3", "DSC00412": names a scanner or converter gives each page. */
+const FILE_NAME_TITLE_RE = /^(img|image|scan|page|pg|dsc|dscn|pict?|photo|untitled|bookmark)[\s_\-.]*\d*$/i;
+
+/**
+ * Bookmarks generated per page by scanning software carry no chapter
+ * information, so a list of them is noise. True when most titles look like
+ * file names.
+ */
+export function looksLikeFileNames(titles: string[]): boolean {
+  if (titles.length === 0) return false;
+  const named = titles.filter((t) => FILE_NAME_TITLE_RE.test(cleanTitle(t))).length;
+  return named >= 0.8 * titles.length;
 }
 
 // ---------------------------------------------------------------- headings fallback

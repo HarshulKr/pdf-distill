@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cleanTitle,
   destinationPage,
+  looksLikeFileNames,
   pagesOfSections,
   sectionsFromEntries,
   sectionsFromHeadings,
@@ -110,6 +111,13 @@ describe('sectionsFromOutline', () => {
       { title: 'Chapter 2', level: 1, startPage: 6, endPage: 10 },
     ]);
   });
+  it('ignores per-page bookmarks named like scanned files', async () => {
+    const doc = fakeDoc([node('IMG', [{ num: 0 }]), node('IMG_0001', [{ num: 1 }]), node('IMG_0002', [{ num: 2 }])]);
+    expect(await sectionsFromOutline(doc)).toEqual([]);
+    expect(looksLikeFileNames(['Scan 1', 'DSC00412', 'Page 3', 'Chapter 1 Force'])).toBe(false);
+    expect(looksLikeFileNames(['Scan 1', 'DSC00412', 'Page 3', 'page_4', 'Contents'])).toBe(true);
+  });
+
   it('returns [] without an outline or when reading it fails', async () => {
     expect(await sectionsFromOutline(fakeDoc(null))).toEqual([]);
     const failing = { ...fakeDoc(null), getOutline: () => Promise.reject(new Error('x')) };

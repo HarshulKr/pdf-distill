@@ -62,8 +62,26 @@ describe('convert', () => {
     const result = convert({ pages: [...pages, empty, columns], selected: [7, 8, 9], options: { pageMarkers: false } });
     expect(result.warnings).toEqual([
       'Page 9 could not be read.',
-      'Page 7 has no text layer (probably scanned images), so it is missing from the output. OCR support is planned.',
+      'Page 7 has no readable text, apart from any headers or watermarks (probably scanned images), so it is missing from the output. OCR support is planned.',
       'Page 8 seems to have columns or a table. Their text may be in the wrong order; check those parts before relying on them.',
+    ]);
+  });
+});
+
+describe('scanned pages with a watermark', () => {
+  it('warns when only a repeated watermark is left, instead of returning empty pages silently', () => {
+    // Every page: a photo (no text) plus "Downloaded from ..." at top and bottom.
+    const watermark = 'Downloaded from https://www.example.com/selina-physics';
+    const scanned = Array.from({ length: 6 }, (_, i) =>
+      page(i + 1, [
+        { text: watermark, y: 18, size: 16 },
+        { text: watermark, y: 739, size: 16 },
+      ]),
+    );
+    const result = convert({ pages: scanned, selected: [1, 2, 3], options: { pageMarkers: false } });
+    expect(result.markdown.trim()).toBe('');
+    expect(result.warnings).toEqual([
+      'Pages 1-3 have no readable text, apart from any headers or watermarks (probably scanned images), so they are missing from the output. OCR support is planned.',
     ]);
   });
 });

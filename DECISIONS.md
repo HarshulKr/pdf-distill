@@ -162,3 +162,13 @@ Whole chapters, estimated tokens (chars/4):
 | Slides, 22 pp. | ~716 | ~843 | ~35,200 |
 
 Cleaning removes junk (AIMA: 46 header lines, 148 margin notes, 254 figure labels), but Markdown structure (headings, list markers, page markers, paragraph breaks) adds back about as much. So the output costs about the same as pasting the raw text, while being far more readable, and 70-98% less than uploading the PDF. The README's claims should say exactly this; Phase 6 will confirm with real token counts.
+
+### D35. Headline: PDF upload → Markdown
+D25 made the headline "raw text of the selected pages → output". On real chapters that reads like "~33,900 → ~32,800", which suggests the tool does nothing, although the actual choice a user makes is between uploading the PDF and pasting the Markdown (D34). The headline is now **rough PDF-upload estimate of the selected pages → output**, labelled as such, and the next line gives the raw-text number of the same pages, so the comparison with copy-pasting stays visible.
+
+### D36. Scanned pages with a watermark
+A scanned Selina Physics chapter has a "Downloaded from …" line at the top and bottom of every page and no other text. That was enough raw text to pass the "no text layer" check, and the watermark was then removed as a running header: the output was 18 empty pages with **no warning**. The check now runs on the text left after cleaning, and the warning says "no readable text, apart from any headers or watermarks". OCR (Phase 4) is the real fix.
+The same PDF's bookmarks are scanner file names ("IMG", "IMG_0001", …). When ≥80% of bookmark titles look like file names, no chapter list is shown.
+
+### D37. "Chapter 1" + title become one heading
+CS229 sets "Chapter 1" and "Linear regression" as two lines; AIMA sets "CHAPTER 3" smaller than "SOLVING PROBLEMS BY SEARCHING", so the label came out as `##` under its own title. A heading that is only a chapter label, directly followed by another heading, is merged into "Chapter 1: Linear regression" at the higher of the two levels.

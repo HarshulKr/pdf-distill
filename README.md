@@ -49,9 +49,9 @@ For live reload while developing: `npm run dev` (WXT opens a Chrome instance wit
 5. Check the Markdown preview (you can edit it), then **Copy** or **Download .md** and paste it into your AI chat.
 
 The stats bar shows `~before → ~after tokens (est.)`:
-- **Before** is the raw text of the pages you selected, including headers, footers and page numbers. **After** is the cleaned Markdown. Both cover the same pages, so the difference is what cleaning saved.
-- Underneath is a **rough** estimate of uploading those pages as a PDF: their text plus about 1,568 tokens per page image, because AI apps also send each page as an image. Phase 6 will replace this with measured numbers.
-- For context, the same two numbers are shown for the whole document.
+- **Before** is a **rough** estimate of uploading the pages you selected as a PDF: their text plus about 1,568 tokens per page image, because AI apps also send each page as an image. Phase 6 will replace this with measured numbers. **After** is the Markdown. This is the choice you are making: upload the PDF, or paste the Markdown.
+- Underneath is the raw text of the same pages. The Markdown usually costs about the same as that raw text: cleaning removes junk, and headings, lists and page markers add a little back. The difference is that the Markdown is clean and structured.
+- For context, the same numbers are shown for the whole document.
 - All numbers are estimates (about 4 characters per token for now), not exact Claude counts.
 
 From the command line, the same pipeline runs in Node:

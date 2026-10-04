@@ -128,14 +128,17 @@ export function convert(input: ConvertInput): ConversionResult {
   const found = new Set(input.pages.map((p) => p.page));
   const missing = input.selected.filter((p) => !found.has(p));
   if (missing.length) warnings.push(`${capitalisedPagesLabel(missing)} could not be read.`);
-  const lowText = input.pages
-    .filter((p) => selectedSet.has(p.page))
-    .filter((p) => p.items.reduce((n, i) => n + i.str.length, 0) < LOW_TEXT_CHARS)
+  // Measured after cleaning: a scanned book often has a one-line watermark
+  // ("Downloaded from ...") on every page. That is enough raw text to look
+  // like a text layer, but it is removed as a running header, which would
+  // otherwise leave empty pages with no warning.
+  const lowText = figures.pages
+    .filter((p) => p.lines.reduce((n, l) => n + l.text.length, 0) < LOW_TEXT_CHARS)
     .map((p) => p.page);
   if (lowText.length) {
     const one = lowText.length === 1;
     warnings.push(
-      `${capitalisedPagesLabel(lowText)} ${one ? 'has' : 'have'} no text layer (probably scanned images), so ${one ? 'it is' : 'they are'} missing from the output. OCR support is planned.`,
+      `${capitalisedPagesLabel(lowText)} ${one ? 'has' : 'have'} no readable text, apart from any headers or watermarks (probably scanned images), so ${one ? 'it is' : 'they are'} missing from the output. OCR support is planned.`,
     );
   }
   const columns = figures.pages.filter((p) => looksMultiColumn(p)).map((p) => p.page);

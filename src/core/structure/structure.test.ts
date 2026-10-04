@@ -10,6 +10,7 @@ import {
   headingKind,
   headingLevel,
   listMarker,
+  mergeChapterLabels,
   startsParagraph,
   type DocumentProfile,
 } from './structure';
@@ -259,5 +260,21 @@ describe('lists', () => {
       ],
       page: 1,
     });
+  });
+});
+
+describe('mergeChapterLabels', () => {
+  const h = (text: string, level: 1 | 2 | 3) => ({ kind: 'heading' as const, level, text, page: 1 });
+  it('joins a chapter label with the title that follows, at the higher level', () => {
+    expect(mergeChapterLabels([h('CHAPTER 3', 2), h('SOLVING PROBLEMS BY SEARCHING', 1)])).toEqual([
+      h('CHAPTER 3: SOLVING PROBLEMS BY SEARCHING', 1),
+    ]);
+    expect(mergeChapterLabels([h('Chapter 1', 1), h('Linear regression', 1)])).toEqual([h('Chapter 1: Linear regression', 1)]);
+  });
+  it('leaves full chapter headings and labels followed by text alone', () => {
+    const blocks = [h('Chapter 1 Cells', 1), h('1.1 Size', 2)];
+    expect(mergeChapterLabels(blocks)).toEqual(blocks);
+    const labelThenText = [h('Chapter 2', 1), { kind: 'paragraph' as const, text: 'Body', page: 1 }];
+    expect(mergeChapterLabels(labelThenText)).toEqual(labelThenText);
   });
 });

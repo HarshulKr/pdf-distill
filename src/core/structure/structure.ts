@@ -357,7 +357,35 @@ export function pageBlocks(page: PageLines, profile: DocumentProfile): Block[] {
     }
   }
   flush();
-  return blocks;
+  return mergeChapterLabels(blocks);
+}
+
+/**
+ * "Chapter 1" followed directly by its title ("Linear regression") becomes
+ * one heading, "Chapter 1: Linear regression", at the higher of the two
+ * levels. Books often set the label smaller than the title, which otherwise
+ * puts the label at the wrong level and splits one heading in two.
+ */
+export function mergeChapterLabels(blocks: Block[]): Block[] {
+  const out: Block[] = [];
+  for (const block of blocks) {
+    const prev = out[out.length - 1];
+    if (
+      block.kind === 'heading' &&
+      prev?.kind === 'heading' &&
+      CHAPTER_ONLY_RE.test(prev.text) &&
+      !CHAPTER_RE.test(block.text)
+    ) {
+      out[out.length - 1] = {
+        ...prev,
+        level: Math.min(prev.level, block.level) as 1 | 2 | 3,
+        text: `${prev.text}: ${block.text}`,
+      };
+      continue;
+    }
+    out.push(block);
+  }
+  return out;
 }
 
 /**

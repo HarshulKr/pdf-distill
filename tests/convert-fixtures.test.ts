@@ -102,7 +102,7 @@ describe('warnings', () => {
   it('flags the page with no text layer', async () => {
     const { warnings } = await convertFixture('no-text-layer.pdf');
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toMatch(/^Page 2 has no text layer/);
+    expect(warnings[0]).toMatch(/^Page 2 has no readable text/);
   });
 
   it.each(['two-column.pdf', 'table.pdf'])('flags possible columns/tables in %s instead of failing silently', async (pdf) => {

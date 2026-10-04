@@ -109,6 +109,6 @@ export interface ConversionResult {
   markdown: string;
   sections: Section[];
   stats: ConversionStats;
-  /** Human-readable, e.g. "Pages 4-9 have no text layer". */
+  /** Human-readable, e.g. "Pages 4-9 have no readable text ...". */
   warnings: string[];
 }

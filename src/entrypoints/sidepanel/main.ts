@@ -315,24 +315,26 @@ function renderWarnings(warnings: string[]): void {
 }
 
 /**
- * Stats bar. The headline compares like with like: raw text of the selected
- * pages -> cleaned output. Whole-document numbers are context only, so a
- * small selection doesn't look like a huge "saving". "After" follows edits in
- * the preview.
+ * Stats bar. The headline is what the user actually chooses between:
+ * uploading the selected pages as a PDF versus pasting this Markdown. Both
+ * cover the same pages. The raw-text number comes next, since the output
+ * costs about the same as raw text (DECISIONS.md D34) and the user should
+ * see that too. Whole-document numbers are context only. "After" follows
+ * edits in the preview.
  */
 function renderStats(): void {
   const result = state.result;
   if (!result) return;
   const { stats } = result;
   const after = estimateTokens(ui.preview.value);
-  ui.tokensBefore.textContent = formatTokenEstimate(stats.tokensSelected);
+  ui.tokensBefore.textContent = formatTokenEstimate(stats.rawUploadTokensSelected);
   ui.tokensAfter.textContent = formatTokenEstimate(after);
 
   const pages = `${stats.pages.toLocaleString()} ${stats.pages === 1 ? 'page' : 'pages'}`;
   const perImage = `~${RAW_PDF_IMAGE_TOKENS_PER_PAGE.toLocaleString('en-US')} per page image`;
   const parts: string[] = [
-    `Before = raw text of the ${pages} you selected. Removed: ${removedSummary(stats)}.`,
-    `Uploading these ${pages} as a PDF would cost roughly ${formatTokenEstimate(stats.rawUploadTokensSelected)} (text + ${perImage}).`,
+    `PDF upload estimate = text + ${perImage}.`,
+    `Raw text of these ${pages}: ${formatTokenEstimate(stats.tokensSelected)}. Removed: ${removedSummary(stats)}.`,
   ];
   const whole = beforeStats(state.whole);
   if (whole.tokensBefore === null || whole.rawUploadTokensBefore === null) {
