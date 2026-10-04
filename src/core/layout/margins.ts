@@ -16,7 +16,7 @@ export interface TextBlock {
 }
 
 export interface MarginOptions {
-  /** Margin text must be smaller than this fraction of body size (dropping same-size text is too risky). */
+  /** Margin text must be smaller than this fraction of body size (dropping near-body-size text is too risky). */
   maxSizeRatio: number;
   /** ...and start/end at least this many ems outside the text block. */
   minGapEms: number;
@@ -33,7 +33,7 @@ export interface MarginOptions {
 }
 
 export const DEFAULT_MARGIN_OPTIONS: MarginOptions = {
-  maxSizeRatio: 0.95,
+  maxSizeRatio: 0.9,
   minGapEms: 0.5,
   minPages: 3,
   minFraction: 0.15,
@@ -102,7 +102,18 @@ function isMarginItem(
   const top = item.y - item.fontSize;
   if (top <= options.edgeZone * page.height || item.y >= (1 - options.edgeZone) * page.height) return false;
   const gap = options.minGapEms * bodySize;
-  return item.x >= block.right + gap || item.x + item.width <= block.left - gap;
+  if (item.x < block.right + gap && item.x + item.width > block.left - gap) return false;
+  // A margin note stands alone beside the body text. Text of the same size
+  // continuing inside the column on the same baseline means a wide line
+  // (a caption, an algorithm box, a table row) that runs past the column.
+  return !page.items.some(
+    (other) =>
+      other !== item &&
+      Math.abs(other.y - item.y) <= 0.5 * item.fontSize &&
+      Math.abs(other.fontSize - item.fontSize) <= 0.5 &&
+      other.x < block.right &&
+      other.x + other.width > block.left,
+  );
 }
 
 export interface MarginResult {

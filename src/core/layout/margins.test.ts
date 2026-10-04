@@ -57,3 +57,18 @@ describe('removeMarginNotes', () => {
     expect(removeMarginNotes(pages).removed).toBe(0);
   });
 });
+
+describe('wide lines are not margin notes', () => {
+  it('keeps small text that continues a line from inside the column (captions, algorithm boxes)', () => {
+    const pages = [1, 2, 3, 4, 5].map((n) => {
+      const page = bookPage(n, 'Note');
+      // A 9pt caption line that starts in the column and runs past its right edge.
+      page.items.push(item('Distribution of the selected events above', 300, 400, 9, 'Times', n));
+      page.items.push(item('150 GeV.', 479, 400, 9, 'Times', n));
+      return page;
+    });
+    const { pages: out, removed } = removeMarginNotes(pages);
+    expect(removed).toBe(5); // only the five "Note" items
+    for (const page of out) expect(page.items.some((i) => i.str === '150 GeV.')).toBe(true);
+  });
+});

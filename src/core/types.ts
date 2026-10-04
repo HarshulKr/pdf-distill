@@ -55,8 +55,17 @@ export type Block =
   | { kind: 'heading'; level: 1 | 2 | 3; text: string; page: number }
   | { kind: 'paragraph'; text: string; page: number }
   | { kind: 'list'; items: ListItem[]; page: number }
-  | { kind: 'table'; rows: string[][]; page: number }
+  | TableBlock
   | { kind: 'pageBreak'; page: number };
+
+/** A table; the first row is rendered as the header. */
+export interface TableBlock {
+  kind: 'table';
+  rows: string[][];
+  page: number;
+  /** Baseline of the first row, used to place the table among the page's text. */
+  y?: number;
+}
 
 /** One list item. Items of different depths and kinds can mix (a numbered list with bullets inside). */
 export interface ListItem {

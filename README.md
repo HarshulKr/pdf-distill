@@ -2,7 +2,7 @@
 
 A Chrome extension that converts PDFs into clean, compact Markdown **locally in your browser**. Keep only the part you need (a chapter, a page range, or the sections relevant to your question), see a before/after token estimate, and paste the result into Claude, ChatGPT or another AI chat.
 
-> **Status: Phase 2 in progress.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed. Tables and two-column pages are still to come. See [Roadmap](#roadmap).
+> **Status: Phase 2 in progress.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed. Two-column pages are still to come. See [Roadmap](#roadmap).
 
 ## Why
 
@@ -94,7 +94,7 @@ Each step is pure TypeScript in `src/core/`, unit tested in Node. Steps marked *
    - Headings are lines ≥1.2× that size, or short bold lines, or "Chapter 3" / "3.2 Title" patterns; sizes map to levels 1–3.
    - Paragraphs are split on larger vertical gaps or indented first lines, and joined across page breaks.
    - Bulleted and numbered lists, including nested ones and items whose lines wrap with a hanging indent.
-   - Tables are *(later)*.
+   - Tables: lines whose text sits in aligned cells become Markdown tables. Plots, matrices and equations, which also line up in columns, are told apart and left as text.
 5. **Chapters** (`outline/`): from the PDF's bookmarks, or, without bookmarks, from large headings found during the whole-document count. Ticking chapters fills in the page range.
 6. **Markdown** (`markdown/`): a source line, optional `<!-- page N -->` markers, headings and paragraphs, with blank lines collapsed.
 7. **Tokens** (`tokens/`): before/after estimates.
@@ -116,7 +116,8 @@ tests/golden/      expected Markdown for fixtures
 
 Current:
 
-- **Two-column pages and tables are read straight across**, so their text can be interleaved. These pages get a warning. Column and table handling is postponed until it can be tested on real two-column PDFs.
+- **Two-column pages are read straight across**, so their text can be interleaved. These pages get a warning. Column handling is postponed until it can be tested on real two-column PDFs.
+- **Tables** with merged cells or multi-line cells come out with one row per printed line. Tables the detector is unsure about stay as text, with a warning.
 - **Margin notes are dropped.** In the textbooks tested they repeat a nearby term, but a book whose margin holds unique content will lose it. Margin text in the body font size is never dropped.
 - **Math** comes out as flattened text (e.g. `J(θ) = (hθ(x(i)) − y(i))2`).
 - **Footnotes** stay where they are printed, as plain paragraphs.

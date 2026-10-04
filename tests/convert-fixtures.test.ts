@@ -105,9 +105,30 @@ describe('warnings', () => {
     expect(warnings[0]).toMatch(/^Page 2 has no readable text/);
   });
 
-  it.each(['two-column.pdf', 'table.pdf'])('flags possible columns/tables in %s instead of failing silently', async (pdf) => {
-    const { warnings } = await convertFixture(pdf);
+  it('flags two-column pages instead of failing silently', async () => {
+    const { warnings } = await convertFixture('two-column.pdf');
     expect(warnings).toEqual([expect.stringMatching(/^Page 1 seems to have columns or a table/)]);
+  });
+});
+
+describe('table.pdf', () => {
+  it('renders the table as a Markdown table between its surrounding paragraphs, without a warning', async () => {
+    const { markdown, warnings } = await convertFixture('table.pdf');
+    expect(warnings).toEqual([]);
+    expect(markdown).toContain(
+      [
+        'The table below compares the main ways substances cross the membrane.',
+        '',
+        '| Mechanism | Energy needed | Example |',
+        '| --- | --- | --- |',
+        '| Simple diffusion | No | Oxygen |',
+        '| Facilitated diffusion | No | Glucose |',
+        '| Active transport | Yes (ATP) | Sodium ions |',
+        '| Endocytosis | Yes | Large particles |',
+        '',
+        'Active transport is the only mechanism',
+      ].join('\n'),
+    );
   });
 });
 

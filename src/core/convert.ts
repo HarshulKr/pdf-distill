@@ -12,8 +12,9 @@ import { renderMarkdown } from './markdown/render';
 import { sectionsInSelection } from './outline/outline';
 import { formatPageList } from './pages/range';
 import { buildBlocks, buildProfile } from './structure/structure';
+import { extractTables } from './structure/tables';
 import { estimateRawPdfUploadTokens, estimateTokens, estimateTokensFromChars } from './tokens/estimate';
-import type { ConversionResult, ConversionStats, PageContent, PageLines, Section } from './types';
+import type { ConversionResult, ConversionStats, PageContent, PageLines, Section, TableBlock } from './types';
 
 export interface ConvertOptions {
   pageMarkers: boolean;
@@ -117,7 +118,13 @@ export function convert(input: ConvertInput): ConversionResult {
   const selectedLines = allLines.filter(isSelected);
   const headers = removeHeadersAndFooters(selectedLines, running, folios);
   const figures = removeFigureLabels(headers.pages);
-  const blocks = buildBlocks(figures.pages, profile);
+  const tablesByPage = new Map<number, TableBlock[]>();
+  const bodyPages = figures.pages.map((p) => {
+    const found = extractTables(p);
+    if (found.tables.length) tablesByPage.set(p.page, found.tables);
+    return found.page;
+  });
+  const blocks = buildBlocks(bodyPages, profile, tablesByPage);
 
   const markdown = renderMarkdown(blocks, {
     pageMarkers: input.options.pageMarkers,
@@ -141,7 +148,8 @@ export function convert(input: ConvertInput): ConversionResult {
       `${capitalisedPagesLabel(lowText)} ${one ? 'has' : 'have'} no readable text, apart from any headers or watermarks (probably scanned images), so ${one ? 'it is' : 'they are'} missing from the output. OCR support is planned.`,
     );
   }
-  const columns = figures.pages.filter((p) => looksMultiColumn(p)).map((p) => p.page);
+  // Checked after tables are taken out, so a page with a recognised table is not flagged.
+  const columns = bodyPages.filter((p) => looksMultiColumn(p)).map((p) => p.page);
   if (columns.length) {
     warnings.push(
       `${capitalisedPagesLabel(columns)} ${columns.length === 1 ? 'seems' : 'seem'} to have columns or a table. Their text may be in the wrong order; check those parts before relying on them.`,

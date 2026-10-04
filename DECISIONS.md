@@ -172,3 +172,26 @@ The same PDF's bookmarks are scanner file names ("IMG", "IMG_0001", …). When �
 
 ### D37. "Chapter 1" + title become one heading
 CS229 sets "Chapter 1" and "Linear regression" as two lines; AIMA sets "CHAPTER 3" smaller than "SOLVING PROBLEMS BY SEARCHING", so the label came out as `##` under its own title. A heading that is only a chapter label, directly followed by another heading, is merged into "Chapter 1: Linear regression" at the higher of the two levels.
+
+### D38. Margin notes: a wide line is not a margin note
+The ATLAS paper (single column) showed D29 cutting real content: "150 GeV." from a 10pt caption that ran past the text column, and pieces of AIMA's full-width algorithm boxes. A small item outside the column is now a margin note only if no text **of the same size** continues inside the column on the same baseline (a margin note stands beside *body-size* text; a wide caption or table row continues in its own size). The size limit was also lowered from 0.95× to 0.9× body size.
+
+### D39. Tables
+`structure/tables.ts`. Tuned on the ATLAS paper (62 pages, ~13 real tables), AIMA, CS229 and two shorter arXiv papers.
+- **Cells:** a line splits into cells at gaps wider than 0.9 em (CS229's header uses exactly 1 em).
+- **Rows:** a run of ≥3 consecutive multi-cell lines of the same font size, about one line apart (≤2.5 em); short single-cell labels ("Single-top:") may sit inside.
+- **Columns:** from gutters, i.e. x ranges no cell covers. Unlike clustering left edges, this works for right-aligned numbers. Columns empty in every row are dropped.
+- **Is it really a table?** Several things line up in columns without being tables. Each rule below was added because a real page produced that false positive:
+  - plot axis ticks: rejected unless some cell has a word;
+  - rows of plot panels: wide grids must be ≥75% filled (narrow ones ≥50%), ≤16 columns;
+  - plot legends: rejected when a "Figure N" caption follows with only labels in between (no prose: three or more ordinary lowercase words). Tables have captions above, so they are unaffected;
+  - displayed math: rejected when >15% of cells are lone letters or brackets/operators, >10% contain ∂ ∑ ∏ ∫ ∇, or a row ends in an equation number "(2)";
+  - "–" (n/a), ". . ." and lone "." are table filler, not math.
+- **Result:** ATLAS 11 tables found, all real (table of contents included); AIMA 1 (the A*/uniform-cost comparison); CS229 2 (the housing data, and a one-hot vector display); no false positives left in the two short papers. Plots and matrices stay as text.
+- Pages with a recognised table no longer get the "columns or a table" warning; unrecognised grids keep it.
+
+### D40. Two-column layout still postponed
+All three arXiv papers supplied for testing are single-column. Column reading order stays unimplemented, with the warning, until a real two-column PDF is available.
+
+### D41. Private Use Area characters are dropped
+TeX math fonts draw large brackets from Private Use Area code points (U+E000-U+F8FF), which come out as garbage characters. They never carry meaning as text, so extraction drops them.

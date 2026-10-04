@@ -71,6 +71,9 @@ function isTextItem(item: PdfTextContentItem): item is PdfTextItemLike {
   return 'str' in item;
 }
 
+/** Unicode category Co: Private Use Area code points. */
+const PRIVATE_USE_RE = /\p{Co}/gu;
+
 /**
  * Font weight words used in PostScript font names, e.g. "Minion-Semibold".
  * TeX fonts say "bold extended" as BX plus a design size: CMBX12, CMSSBX10,
@@ -115,11 +118,14 @@ export function mapTextItems(
   const out: TextItem[] = [];
   for (const raw of items) {
     if (!isTextItem(raw)) continue;
-    if (raw.str.trim() === '') continue; // spacing is recomputed from geometry
+    // Private Use Area code points are font-specific glyphs (pieces of big
+    // brackets in TeX math) with no meaning as text.
+    const str = raw.str.replace(PRIVATE_USE_RE, '');
+    if (str.trim() === '') continue; // spacing is recomputed from geometry
     const m = multiplyTransform(viewport.transform, raw.transform);
     const fontSize = Math.hypot(m[2] ?? 0, m[3] ?? 0) || raw.height || 1;
     out.push({
-      str: raw.str,
+      str,
       x: m[4] ?? 0,
       y: m[5] ?? 0,
       width: raw.width,

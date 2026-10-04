@@ -57,7 +57,11 @@ describe('convert', () => {
       page: 8,
       width: 612,
       height: 792,
-      items: [0, 1, 2, 3].flatMap((i) => [item(`left ${i}`, 72, 200 + i * 15, 11, 'Times', 8), item(`right ${i}`, 330, 200 + i * 15, 11, 'Times', 8)]),
+      // Two columns of prose (long cells), so it is not mistaken for a table.
+      items: [0, 1, 2, 3].flatMap((i) => [
+        item(`left column prose line ${i} with several words`, 72, 200 + i * 15, 9, 'Times', 8),
+        item(`right column prose line ${i} with several words`, 330, 200 + i * 15, 9, 'Times', 8),
+      ]),
     };
     const result = convert({ pages: [...pages, empty, columns], selected: [7, 8, 9], options: { pageMarkers: false } });
     expect(result.warnings).toEqual([

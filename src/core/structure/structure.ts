@@ -6,7 +6,7 @@
 
 import { collectEvidence, joinLines, type HyphenEvidence } from '../clean/hyphenation';
 import { roundSize } from '../layout/lines';
-import type { Block, Line, ListItem, PageLines } from '../types';
+import type { Block, Line, ListItem, PageLines, TableBlock } from '../types';
 
 export interface DocumentProfile {
   /** Most common font size, weighted by characters. */
@@ -282,7 +282,8 @@ export function continuesItem(item: OpenItem, line: Line, profile: DocumentProfi
 }
 
 /** Headings and paragraphs of one page, in reading order. */
-export function pageBlocks(page: PageLines, profile: DocumentProfile): Block[] {
+export function pageBlocks(page: PageLines, profile: DocumentProfile, tables: TableBlock[] = []): Block[] {
+  const pendingTables = [...tables].sort((a, b) => (a.y ?? 0) - (b.y ?? 0));
   const blocks: Block[] = [];
   // At most one of these is open at a time.
   const open: {
@@ -307,6 +308,12 @@ export function pageBlocks(page: PageLines, profile: DocumentProfile): Block[] {
   };
 
   for (const line of page.lines) {
+    // Tables were taken out of the lines; put each back where it started.
+    while (pendingTables.length && (pendingTables[0]?.y ?? 0) < line.y) {
+      flush();
+      const table = pendingTables.shift();
+      if (table) blocks.push(table);
+    }
     const kind = headingKind(line, profile);
     const marker = listMarker(line);
     // A marker wins over bold/numbered heading rules ("1. Introduction" on a
@@ -357,6 +364,7 @@ export function pageBlocks(page: PageLines, profile: DocumentProfile): Block[] {
     }
   }
   flush();
+  blocks.push(...pendingTables);
   return mergeChapterLabels(blocks);
 }
 
@@ -405,11 +413,15 @@ export function continuesParagraph(prev: Block | undefined, next: Block | undefi
  * paragraph; the next page's marker then follows the joined paragraph, so
  * page markers are approximate at paragraph granularity.
  */
-export function buildBlocks(pages: PageLines[], profile: DocumentProfile): Block[] {
+export function buildBlocks(
+  pages: PageLines[],
+  profile: DocumentProfile,
+  tablesByPage: Map<number, TableBlock[]> = new Map(),
+): Block[] {
   const blocks: Block[] = [];
   let prevPage: number | null = null;
   for (const page of pages) {
-    const own = pageBlocks(page, profile);
+    const own = pageBlocks(page, profile, tablesByPage.get(page.page));
     const last = blocks[blocks.length - 1];
     // Only join across consecutive pages: in a selection like "45-70, 82",
     // the end of page 70 does not continue on page 82.
