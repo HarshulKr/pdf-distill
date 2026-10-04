@@ -260,3 +260,18 @@ The default "display" intent paces rendering with requestAnimationFrame, which n
 
 ### D49. A realistic scanned fixture (closes D6)
 D6's blocky 5x7 shapes OCR poorly ("THE CELL HALL GIVES" for "THE CELL WALL GIVES PLANTS"), as predicted. `scanned.pdf` is page 1 of running-headers.pdf rendered at 200 DPI with pdf.js and embedded as an image only. OCR reads it word-perfectly, including hyphen repair across lines; it is regenerated deterministically (same MD5 on every run) and drives an end-to-end OCR test (~5 s). `no-text-layer.pdf` stays as the "no text at all" fixture.
+
+---
+
+## Phase 5
+
+### D50. Insert into chat: optional host permissions, paste first, never send
+- **Permissions:** `scripting` is added (to run one function in the chat tab when Insert is pressed). claude.ai, chatgpt.com and chat.openai.com are `optional_host_permissions`: nothing is granted at install, and Chrome asks the first time Insert is pressed (`permissions.request` is called first in the click handler, because the prompt needs the user gesture). The user can revoke access in `chrome://extensions`. No content scripts run on those sites at any other time.
+  *Alternative:* `activeTab`. Rejected: it is granted by clicking the toolbar icon, not by a button inside the side panel later, so Insert would fail after the first navigation.
+- **Which tab:** the active tab of the panel's window, and only if its URL is https on one of those hosts (exact host match, so `claude.ai.evil.com` is rejected).
+- **How text goes in** (`lib/insert-page.ts`, self-contained because Chrome serialises it):
+  1. Find the message box: `#prompt-textarea` (ChatGPT), `div.ProseMirror[contenteditable]` (Claude), then any visible rich-text box, then a textarea. Put the caret at the end, after anything already typed.
+  2. Dispatch a synthetic `paste` event carrying the Markdown. Both apps handle paste, and Claude turns a long paste into an attachment card. If the app calls `preventDefault`, it took the text.
+  3. Otherwise type it with `execCommand('insertText')` (deprecated, but the only way to type into a rich editor that the editor notices; supported everywhere), or `setRangeText` plus an input event for a textarea.
+- **Never sends.** The user reviews the text and presses Send themselves.
+- **Verified** on four local mock pages (a Claude-like editor that converts long pastes to attachments; a ChatGPT-like editor that ignores synthetic paste, exercising the typing fallback; a textarea; a page with no message box), calling the function rebuilt from its own source text exactly as Chrome serialises it. The live sites can only be tested in the user's own logged-in Chrome; their DOM can change, so Copy stays available and failures say "use Copy".

@@ -9,6 +9,7 @@ import { pagesOfSections, sectionsFromHeadings, sectionsFromOutline } from '@/co
 import { formatPageList, parsePageRange, samplePages } from '@/core/pages/range';
 import { countTokens, formatTokenEstimate, RAW_PDF_IMAGE_TOKENS_PER_PAGE, TOKENIZER_NAME } from '@/core/tokens/estimate';
 import type { ConversionResult, PageContent, Section } from '@/core/types';
+import { insertIntoActiveChat } from '@/lib/insert';
 import { createOcrEngine, type OcrEngine } from '@/lib/ocr';
 import { loadPdf, PdfLoadError, type LoadedPdf } from '@/lib/pdf';
 import { loadSettings, saveSettings, type Settings } from '@/lib/settings';
@@ -52,6 +53,7 @@ const ui = {
   preview: el('preview', HTMLTextAreaElement),
   copy: el('copy', HTMLButtonElement),
   download: el('download', HTMLButtonElement),
+  insert: el('insert', HTMLButtonElement),
   copyStatus: el('copy-status', HTMLElement),
   ocrOffer: el('ocr-offer', HTMLElement),
   runOcr: el('run-ocr', HTMLButtonElement),
@@ -413,6 +415,20 @@ function renderStats(): void {
   ui.statsDetail.textContent = parts.join(' ');
 }
 
+/** Insert into the Claude/ChatGPT tab. Called straight from the click (permission prompt needs the gesture). */
+async function insertMarkdown(): Promise<void> {
+  ui.copyStatus.textContent = '';
+  ui.insert.disabled = true;
+  try {
+    const outcome = await insertIntoActiveChat(ui.preview.value);
+    ui.copyStatus.textContent = outcome.ok
+      ? `Inserted into ${outcome.site.name}. Check it, then press Send there.`
+      : outcome.message;
+  } finally {
+    ui.insert.disabled = false;
+  }
+}
+
 async function copyMarkdown(): Promise<void> {
   try {
     await navigator.clipboard.writeText(ui.preview.value);
@@ -502,6 +518,7 @@ ui.preview.addEventListener('input', () => {
   clearTimeout(statsTimer);
   statsTimer = setTimeout(renderStats, 250);
 });
+ui.insert.addEventListener('click', () => void insertMarkdown());
 ui.copy.addEventListener('click', () => void copyMarkdown());
 ui.download.addEventListener('click', downloadMarkdown);
 ui.runOcr.addEventListener('click', () => void runOcr());

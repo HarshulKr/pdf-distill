@@ -16,9 +16,13 @@ export default defineConfig({
     name: 'PDF Distill',
     description:
       'Convert PDFs to clean, compact Markdown locally, keep only the part you need, and save AI tokens.',
-    // Minimal permissions (see DECISIONS.md). Host permissions for claude.ai /
-    // chatgpt.com are added only in Phase 5.
-    permissions: ['sidePanel', 'storage', 'clipboardWrite'],
+    // Minimal permissions (see DECISIONS.md). "scripting" lets Insert put the
+    // Markdown into a chat tab; access to the chat sites themselves is
+    // optional and only requested when Insert is first pressed (D50). Keep
+    // optional_host_permissions in sync with CHAT_ORIGINS in
+    // src/core/insert/sites.ts.
+    permissions: ['sidePanel', 'storage', 'clipboardWrite', 'scripting'],
+    optional_host_permissions: ['https://claude.ai/*', 'https://chatgpt.com/*', 'https://chat.openai.com/*'],
     action: {
       default_title: 'Open PDF Distill',
     },

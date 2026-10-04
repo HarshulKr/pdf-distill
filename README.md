@@ -2,7 +2,7 @@
 
 A Chrome extension that converts PDFs into clean, compact Markdown **locally in your browser**. Keep only the part you need (a chapter, a page range, or the sections relevant to your question), see a before/after token estimate, and paste the result into Claude, ChatGPT or another AI chat.
 
-> **Status: Phase 4 done.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed, and reads scanned pages with on-device OCR. See [Roadmap](#roadmap).
+> **Status: Phase 5 in testing.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed, reads scanned pages with on-device OCR, and inserts the result into Claude or ChatGPT. See [Roadmap](#roadmap).
 
 ## Why
 
@@ -28,6 +28,7 @@ Compared with copy-pasting the raw text, the output is 6-14% smaller for books a
   - the cl100k tokenizer;
   - OCR: tesseract.js 7.0.0, its WebAssembly engine and the English model (`eng` 4.0.0_best_int).
 - OCR runs only when you press **Run OCR**, on this computer.
+- **Permissions:** `sidePanel`, `storage`, `clipboardWrite` and `scripting`. Access to claude.ai and chatgpt.com is *optional*: Chrome asks the first time you press **Insert into chat**, and you can revoke it in `chrome://extensions`. The extension only touches those sites when you press Insert, and only to put text in the message box.
 
 ## Install (unpacked, for development)
 
@@ -52,7 +53,9 @@ For live reload while developing: `npm run dev` (WXT opens a Chrome instance wit
 3. Optionally tick chapters in the **Chapters** list (shown when the PDF has bookmarks or clear chapter headings), or type pages, e.g. `45-70, 82`, `100-` (to the end), or leave it empty for all pages.
 4. Click **Convert**. A progress bar shows "Reading page X of Y"; **Cancel** stops it.
 5. If some pages are scanned images, a **Run OCR on pages … (~time)** button appears. Press it to read them on this computer (about 6-8 s per page; **Cancel** keeps the pages finished so far).
-6. Check the Markdown preview (you can edit it), then **Copy** or **Download .md** and paste it into your AI chat.
+6. Check the Markdown preview (you can edit it), then:
+   - **Insert into chat**: with Claude or ChatGPT open in the current tab, puts the Markdown into the message box. It never presses Send. The first time, Chrome asks you to allow access to claude.ai and chatgpt.com.
+   - or **Copy** / **Download .md** and paste it wherever you like.
 
 The stats bar shows `~before → ~after tokens (est.)`:
 - **Before** is a **rough** estimate of uploading the pages you selected as a PDF: their text plus about 1,568 tokens per page image, because AI apps also send each page as an image. Phase 6 will replace this with measured numbers. **After** is the Markdown. This is the choice you are making: upload the PDF, or paste the Markdown.
@@ -143,7 +146,7 @@ Known non-goals: perfect table and math reconstruction, understanding images/dia
 - [x] Phase 2: chapters and structure quality
 - ~~Phase 3: question-aware trimming~~ (dropped: not worth the complexity for this tool)
 - [x] Phase 4: OCR for scanned pages
-- [ ] Phase 5: insert into Claude / ChatGPT
+- [ ] Phase 5: insert into Claude / ChatGPT (built; awaiting a check on the live sites)
 - [ ] Phase 6: evaluation with exact token counts
 
 ## Eval results
