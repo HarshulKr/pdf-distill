@@ -46,6 +46,13 @@ describe('headingKind', () => {
   it('chapter patterns', () => {
     expect(headingKind(line('Chapter 3'), profile)).toBe('chapter');
     expect(headingKind(line('CHAPTER III'), profile)).toBe('chapter');
+    expect(headingKind(line('Appendix B'), profile)).toBe('chapter');
+    expect(headingKind(line('CHAPTER 3 CELL MEMBRANES'), profile)).toBe('chapter');
+    expect(headingKind(line('Chapter 3 Cell Membranes', { bold: true, width: 200 }), profile)).toBe('chapter');
+  });
+  it('a body-size sentence that starts with "Chapter 3" is not a heading', () => {
+    expect(headingKind(line('Chapter 3 showed how membranes form, and in this'), profile)).toBeNull();
+    expect(headingKind(line('Section 2 of the Act provides that no person'), profile)).toBeNull();
   });
   it('numbered pattern needs bold or a slightly larger size', () => {
     expect(headingKind(line('3.2 Transport', { fontSize: 12.5 }), profile)).toBe('numbered');
@@ -162,6 +169,19 @@ describe('buildBlocks', () => {
       pageLines(2, bodyLines(['lowercase start but new paragraph'], 80)),
     ];
     expect(buildBlocks(pages, buildProfile(pages)).filter((b) => b.kind === 'paragraph')).toHaveLength(2);
+  });
+
+  it('does not join across a gap in the selection (page 70 -> page 82)', () => {
+    const pages = [
+      pageLines(70, bodyLines(['The membrane is built from'], 700)),
+      pageLines(82, bodyLines(['proteins that span the bilayer.'], 80)),
+    ];
+    expect(buildBlocks(pages, buildProfile(pages))).toEqual([
+      { kind: 'pageBreak', page: 70 },
+      { kind: 'paragraph', text: 'The membrane is built from', page: 70 },
+      { kind: 'pageBreak', page: 82 },
+      { kind: 'paragraph', text: 'proteins that span the bilayer.', page: 82 },
+    ]);
   });
 });
 

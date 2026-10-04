@@ -4,6 +4,7 @@ import type { PageLines } from '../types';
 import {
   edgeZoneOf,
   findRunningLines,
+  hasNearbyRun,
   isPageNumberText,
   normalizeEdgeLine,
   removeHeadersAndFooters,
@@ -44,8 +45,27 @@ describe('findRunningLines', () => {
   });
 
   it('needs more than 40% of pages', () => {
-    // 4 of 10 pages = exactly 40%: not more than 40%.
-    const pages = Array.from({ length: 10 }, (_, i) => bookPage(i + 1, i < 4 ? 'Sometimes' : null, null));
+    // 4 of 10 pages = exactly 40%: not more than 40%. Spread out (pages 1, 2,
+    // 9, 10) so the nearby rule does not apply either.
+    const on = new Set([1, 2, 9, 10]);
+    const pages = Array.from({ length: 10 }, (_, i) => bookPage(i + 1, on.has(i + 1) ? 'Sometimes' : null, null));
+    expect(findRunningLines(pages).size).toBe(0);
+  });
+
+  it('finds a short chapter\'s odd-page header in a 31-page sample (nearby rule)', () => {
+    // Pages 1-31; the chapter runs 10-19 and prints its title on odd pages:
+    // 5 of 31 pages (16%), far under 40%.
+    const pages = Array.from({ length: 31 }, (_, i) => {
+      const n = i + 1;
+      const inChapter = n >= 10 && n <= 19;
+      return bookPage(n, inChapter && n % 2 ? 'Chapter 4 Membrane Transport' : 'Principles of Biology', null);
+    });
+    expect(findRunningLines(pages)).toContain('top:chapter # membrane transport');
+  });
+
+  it('ignores a line that appears on 3 pages far apart', () => {
+    const on = new Set([1, 12, 25]);
+    const pages = Array.from({ length: 31 }, (_, i) => bookPage(i + 1, on.has(i + 1) ? 'Exercises' : null, null));
     expect(findRunningLines(pages).size).toBe(0);
   });
 
@@ -89,5 +109,14 @@ describe('removeHeadersAndFooters', () => {
       'Body text on page 1 that is long enough to be a real line.',
       '12',
     ]);
+  });
+});
+
+describe('hasNearbyRun', () => {
+  it('checks whether `count` sorted pages fit within `span`', () => {
+    expect(hasNearbyRun([10, 12, 14], 3, 6)).toBe(true);
+    expect(hasNearbyRun([10, 13, 17], 3, 6)).toBe(false);
+    expect(hasNearbyRun([1, 20, 22, 24], 3, 6)).toBe(true);
+    expect(hasNearbyRun([1, 2], 3, 6)).toBe(false);
   });
 });

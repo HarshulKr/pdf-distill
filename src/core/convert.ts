@@ -10,7 +10,7 @@ import { renderMarkdown } from './markdown/render';
 import { formatPageList } from './pages/range';
 import { buildBlocks, buildProfile } from './structure/structure';
 import { estimateRawPdfUploadTokens, estimateTokens, estimateTokensFromChars } from './tokens/estimate';
-import type { ConversionResult, PageContent } from './types';
+import type { ConversionResult, PageContent, PageLines } from './types';
 
 export interface ConvertOptions {
   pageMarkers: boolean;
@@ -61,6 +61,21 @@ export function beforeStats(whole: WholeDocumentCount | null | undefined): {
   };
 }
 
+/**
+ * Characters of raw extracted text, counted like countDocumentText: every
+ * item's text plus one newline per line, before any cleaning.
+ */
+export function rawTextChars(pages: PageLines[]): number {
+  let chars = 0;
+  for (const page of pages) {
+    for (const line of page.lines) {
+      chars += 1;
+      for (const item of line.items) chars += item.str.length;
+    }
+  }
+  return chars;
+}
+
 export function convert(input: ConvertInput): ConversionResult {
   const selectedSet = new Set(input.selected);
   const allLines = input.pages.map(pageToLines);
@@ -100,11 +115,17 @@ export function convert(input: ConvertInput): ConversionResult {
     );
   }
 
+  const charsSelected = rawTextChars(selectedLines);
+  const tokensSelected = estimateTokensFromChars(charsSelected);
+
   return {
     markdown,
     sections: [],
     stats: {
       pages: input.selected.length,
+      charsSelected,
+      tokensSelected,
+      rawUploadTokensSelected: estimateRawPdfUploadTokens(tokensSelected, input.selected.length),
       ...beforeStats(input.wholeDocument),
       charsAfter: markdown.length,
       tokensAfter: estimateTokens(markdown),

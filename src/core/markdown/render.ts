@@ -10,11 +10,16 @@ export interface RenderOptions {
 }
 
 /**
- * Escape characters that would change meaning at the start of a paragraph.
- * A leading "#" would turn body text into a heading.
+ * Escape characters that would change meaning at the start of a paragraph:
+ * "# " makes a heading, "1. " / "1) " an ordered list, "- " / "* " / "+ " a
+ * bullet list, and ">" a quote.
  */
-function escapeParagraph(text: string): string {
-  return text.replace(/^(#{1,6})(\s)/, '\\$1$2');
+export function escapeParagraph(text: string): string {
+  return text
+    .replace(/^(#{1,6})(\s)/, '\\$1$2')
+    .replace(/^(\d{1,9})([.)])(\s)/, '$1\\$2$3')
+    .replace(/^([-*+])(\s)/, '\\$1$2')
+    .replace(/^>/, '\\>');
 }
 
 function escapeTableCell(text: string): string {

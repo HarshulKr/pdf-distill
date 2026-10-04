@@ -248,29 +248,34 @@ function renderWarnings(warnings: string[]): void {
   ui.warnings.hidden = warnings.length === 0;
 }
 
-/** Stats bar. "After" follows edits in the preview. */
+/**
+ * Stats bar. The headline compares like with like: raw text of the selected
+ * pages -> cleaned output. Whole-document numbers are context only, so a
+ * small selection doesn't look like a huge "saving". "After" follows edits in
+ * the preview.
+ */
 function renderStats(): void {
   const result = state.result;
   if (!result) return;
-  const before = beforeStats(state.whole);
+  const { stats } = result;
   const after = estimateTokens(ui.preview.value);
-  ui.tokensBefore.textContent = before.tokensBefore === null ? '…' : formatTokenEstimate(before.tokensBefore);
+  ui.tokensBefore.textContent = formatTokenEstimate(stats.tokensSelected);
   ui.tokensAfter.textContent = formatTokenEstimate(after);
 
-  const parts: string[] = [];
-  if (before.tokensBefore === null) {
-    parts.push('Before = text of the whole document (still measuring).');
+  const pages = `${stats.pages.toLocaleString()} ${stats.pages === 1 ? 'page' : 'pages'}`;
+  const perImage = `~${RAW_PDF_IMAGE_TOKENS_PER_PAGE.toLocaleString('en-US')} per page image`;
+  const parts: string[] = [
+    `Before = raw text of the ${pages} you selected; ${stats.removedLines.toLocaleString()} header/footer/page-number lines removed.`,
+    `Uploading these ${pages} as a PDF would cost roughly ${formatTokenEstimate(stats.rawUploadTokensSelected)} (text + ${perImage}).`,
+  ];
+  const whole = beforeStats(state.whole);
+  if (whole.tokensBefore === null || whole.rawUploadTokensBefore === null) {
+    parts.push('Whole document: still measuring.');
   } else {
-    parts.push(`Before = text of the whole ${state.whole?.pages ?? ''}-page document.`);
-  }
-  if (before.rawUploadTokensBefore !== null) {
     parts.push(
-      `Uploading the raw PDF would cost roughly ${formatTokenEstimate(before.rawUploadTokensBefore)} tokens (rough: text + ~${RAW_PDF_IMAGE_TOKENS_PER_PAGE.toLocaleString('en-US')} per page image).`,
+      `Whole ${state.whole?.pages.toLocaleString() ?? ''}-page document: ${formatTokenEstimate(whole.tokensBefore)} of text, roughly ${formatTokenEstimate(whole.rawUploadTokensBefore)} as a PDF upload.`,
     );
   }
-  parts.push(
-    `Output covers ${result.stats.pages.toLocaleString()} ${result.stats.pages === 1 ? 'page' : 'pages'}; ${result.stats.removedLines.toLocaleString()} header/footer/page-number lines removed.`,
-  );
   ui.statsDetail.textContent = parts.join(' ');
 }
 

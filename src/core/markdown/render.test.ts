@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Block } from '../types';
-import { markdownFileName, renderMarkdown, tidy } from './render';
+import { escapeParagraph, markdownFileName, renderMarkdown, tidy } from './render';
 
 const blocks: Block[] = [
   { kind: 'pageBreak', page: 3 },
@@ -47,5 +47,19 @@ describe('markdownFileName', () => {
     expect(markdownFileName('Biology: Ch3.pdf', '45-70, 82')).toBe('Biology_ Ch3 (p45-70,82).md');
     expect(markdownFileName('notes.PDF', null)).toBe('notes.md');
     expect(markdownFileName('.pdf', null)).toBe('document.md');
+  });
+});
+
+describe('escapeParagraph', () => {
+  it('stops body text from turning into headings, lists or quotes', () => {
+    expect(escapeParagraph('# 1 priority')).toBe('\\# 1 priority');
+    expect(escapeParagraph('1999. That was the year')).toBe('1999\\. That was the year');
+    expect(escapeParagraph('2) is the second case')).toBe('2\\) is the second case');
+    expect(escapeParagraph('- 5 degrees is cold')).toBe('\\- 5 degrees is cold');
+    expect(escapeParagraph('> 40% of cells')).toBe('\\> 40% of cells');
+  });
+  it('leaves ordinary text alone', () => {
+    expect(escapeParagraph('3.2 million cells divide')).toBe('3.2 million cells divide');
+    expect(escapeParagraph('Plain text - with a dash')).toBe('Plain text - with a dash');
   });
 });

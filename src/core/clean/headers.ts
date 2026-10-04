@@ -17,13 +17,33 @@ export interface HeaderFooterOptions {
   minFraction: number;
   /** ...and on at least this many pages, so 2-page samples never trigger. */
   minPages: number;
+  /**
+   * Alternatively, a line is running if it appears on `minPages` pages that
+   * all fall within this many consecutive page numbers. This catches headers
+   * that change often: a chapter title printed on odd pages of a 20-page
+   * chapter is on ~10 of the ~31 sampled pages (32%, under minFraction), and
+   * section-title headers change every few pages. 6 allows odd-only headers
+   * (pages n, n+2, n+4) and one missing page (e.g. a full-page figure).
+   */
+  nearbySpan: number;
 }
 
 export const DEFAULT_HEADER_FOOTER_OPTIONS: HeaderFooterOptions = {
   edgeZone: 0.08,
   minFraction: 0.4,
   minPages: 3,
+  nearbySpan: 6,
 };
+
+/** True if some `count` of the sorted page numbers fit within `span` pages. */
+export function hasNearbyRun(sortedPages: number[], count: number, span: number): boolean {
+  for (let i = 0; i + count - 1 < sortedPages.length; i++) {
+    const first = sortedPages[i] ?? 0;
+    const last = sortedPages[i + count - 1] ?? 0;
+    if (last - first <= span) return true;
+  }
+  return false;
+}
 
 /** Normalise so "Chapter 2 · Page 14" and "Chapter 2 · Page 15" match. */
 export function normalizeEdgeLine(text: string): string {
@@ -48,7 +68,8 @@ export function findRunningLines(
   pages: PageLines[],
   options: HeaderFooterOptions = DEFAULT_HEADER_FOOTER_OPTIONS,
 ): Set<string> {
-  const counts = new Map<string, number>();
+  /** Key -> page numbers it appears on (each page once). */
+  const seenOn = new Map<string, number[]>();
   for (const page of pages) {
     const seen = new Set<string>(); // count each key once per page
     for (const line of page.lines) {
@@ -56,14 +77,19 @@ export function findRunningLines(
       if (!zone) continue;
       seen.add(`${zone}:${normalizeEdgeLine(line.text)}`);
     }
-    for (const key of seen) counts.set(key, (counts.get(key) ?? 0) + 1);
+    for (const key of seen) {
+      const list = seenOn.get(key);
+      if (list) list.push(page.page);
+      else seenOn.set(key, [page.page]);
+    }
   }
   const running = new Set<string>();
-  for (const [key, count] of counts) {
-    // "More than 40%" per the spec, and at least minPages.
-    if (count >= options.minPages && count > options.minFraction * pages.length) {
-      running.add(key);
-    }
+  for (const [key, onPages] of seenOn) {
+    if (onPages.length < options.minPages) continue;
+    // "More than 40%" of the sample per the spec, or repeated on nearby pages.
+    const frequent = onPages.length > options.minFraction * pages.length;
+    const sorted = [...onPages].sort((a, b) => a - b);
+    if (frequent || hasNearbyRun(sorted, options.minPages, options.nearbySpan)) running.add(key);
   }
   return running;
 }

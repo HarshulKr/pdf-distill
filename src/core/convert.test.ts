@@ -37,6 +37,16 @@ describe('convert', () => {
     expect(result.stats.tokensAfter).toBe(Math.ceil(result.markdown.length / 4));
   });
 
+  it('measures the selected pages raw, so "before" is like-for-like with "after"', () => {
+    const result = convert({ pages, selected: [2, 3], options: { pageMarkers: false } });
+    // Per page: header (23) + body (50) + footer (1) chars, plus 3 newlines.
+    const perPage = 'INTRODUCTION TO BIOLOGY'.length + 'Text of page 2 goes here and is plain body text.'.length + 1 + 3;
+    expect(result.stats.charsSelected).toBe(2 * perPage);
+    expect(result.stats.tokensSelected).toBe(Math.ceil((2 * perPage) / 4));
+    expect(result.stats.rawUploadTokensSelected).toBe(result.stats.tokensSelected + 2 * 1568);
+    expect(result.stats.tokensAfter).toBeLessThan(result.stats.tokensSelected);
+  });
+
   it('leaves "before" stats null while the count is running', () => {
     expect(beforeStats(null)).toEqual({ charsBefore: null, tokensBefore: null, rawUploadTokensBefore: null });
   });

@@ -69,6 +69,16 @@ export interface ConversionStats {
   /** Number of pages converted. */
   pages: number;
   /**
+   * Raw extracted text of the SELECTED pages, before cleaning (headers,
+   * footers and page numbers included). This is the like-for-like "before"
+   * for `tokensAfter`: comparing against the whole document would mostly
+   * measure how few pages were selected, not what cleaning saved.
+   */
+  charsSelected: number;
+  tokensSelected: number;
+  /** Rough estimate of uploading just the selected pages as a PDF. */
+  rawUploadTokensSelected: number;
+  /**
    * "Before" numbers describe the WHOLE document. They are null while the
    * background whole-document count is still running.
    */

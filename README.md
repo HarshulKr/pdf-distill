@@ -39,8 +39,9 @@ For live reload while developing: `npm run dev` (WXT opens a Chrome instance wit
 5. Check the Markdown preview (you can edit it), then **Copy** or **Download .md** and paste it into your AI chat.
 
 The stats bar shows `~before → ~after tokens (est.)`:
-- **Before** is the text of the whole document.
-- Underneath is a **rough** estimate of uploading the raw PDF: its text plus about 1,568 tokens per page image, because AI apps also send each page as an image. Phase 6 will replace this with measured numbers.
+- **Before** is the raw text of the pages you selected, including headers, footers and page numbers. **After** is the cleaned Markdown. Both cover the same pages, so the difference is what cleaning saved.
+- Underneath is a **rough** estimate of uploading those pages as a PDF: their text plus about 1,568 tokens per page image, because AI apps also send each page as an image. Phase 6 will replace this with measured numbers.
+- For context, the same two numbers are shown for the whole document.
 - All numbers are estimates (about 4 characters per token for now), not exact Claude counts.
 
 From the command line, the same pipeline runs in Node:
@@ -71,7 +72,7 @@ Each step is pure TypeScript in `src/core/`, unit tested in Node. Steps marked *
 1. **Extract** (`extract/`): pdf.js text items with positions, font sizes and real font names (for bold). Pages with almost no text are flagged.
 2. **Lines** (`layout/`): items are grouped into lines by baseline and sorted top to bottom, with spaces inserted at visual gaps. Two-column handling is *(later)*; for now such pages get a warning.
 3. **Clean** (`clean/`):
-   - Running headers and footers are lines in the top or bottom 8% of the page that repeat on more than 40% of the pages within ±15 of your selection.
+   - Running headers and footers are lines in the top or bottom 8% of the page that repeat on more than 40% of the pages within ±15 of your selection, or on 3 pages close together (for headers that change every chapter or section).
    - Page numbers ("12", "xiv", "Page 3 of 40") in those zones are removed.
    - Words split across lines are rejoined, using evidence from the document to keep real compounds like "water-fearing".
 4. **Structure** (`structure/`):

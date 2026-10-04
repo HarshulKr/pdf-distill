@@ -96,3 +96,27 @@ Excluding M and D stops words like "mix" (1009) and "dim" from being treated as 
 
 ### D21. `npm run convert` CLI
 `scripts/convert.ts` runs the same pipeline in Node (pdf.js legacy build), useful for checking real PDFs from `tests/fixtures/local/`. Phase 6's eval script reuses `scripts/lib/node-pdf.ts`.
+
+---
+
+## Phase 2
+
+### D22. "Chapter 3" at body size needs typographic support
+The chapter pattern alone made any short line starting "Chapter 3…" or "Section 2…" a level-1 heading, including a wrapped sentence such as "Chapter 3 showed how membranes form, and in this". It now also needs one of: bold, ≥1.1× body size, all caps, or the label alone on its line ("Chapter 3", "Appendix B").
+
+### D23. Running headers: frequent OR repeated on nearby pages
+D13's "more than 40% of the ±15-page sample" misses headers that change often. A chapter title printed on odd pages of a 20-page chapter is on ~10 of ~31 sampled pages (32%), and section-title headers change every few pages. A line in the edge zone is now also running if it appears on 3 pages within a span of 6 page numbers. 6 covers odd-only headers (n, n+2, n+4) plus one skipped page.
+*Risk:* a non-header line repeated near the top or bottom of 3 nearby pages would be removed. Edge zones rarely hold body text, so this was judged acceptable.
+
+### D24. Paragraphs join only across consecutive pages
+With a selection like `45-70, 82`, a sentence cut off at the end of page 70 was glued onto page 82. Joining now requires the next page number to follow directly.
+
+### D25. Headline token numbers compare like with like
+Phase 1's headline was whole-document text → output. For a 5-page selection of a 500-page book, that mostly measured how few pages were selected, not what cleaning saved. The headline is now **raw text of the selected pages → output**, and the detail line adds:
+- a rough upload estimate for just those pages (D8's formula)
+- the whole document's text and upload estimate, as context
+
+`ConversionStats` gains `charsSelected`, `tokensSelected` and `rawUploadTokensSelected`. Raw text is counted the same way as the whole-document count (item text plus one newline per line, before cleaning).
+
+### D26. More paragraph-start escaping
+Body paragraphs starting with `1. `, `2) `, `- `, `* `, `+ ` or `>` would render as lists or quotes. They are now escaped (`1\. `, `\- `, `\>`), in addition to the existing `# ` escape.

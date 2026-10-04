@@ -66,6 +66,13 @@ export function bodyFontSize(lines: Line[]): number {
 }
 
 const CHAPTER_RE = /^(chapter|part|unit|lecture|section|appendix|module)\s+([0-9]+|[ivxlcdm]+|[a-z])\b/i;
+/** The label alone, e.g. "Chapter 3" or "Appendix B", with nothing after it. */
+const CHAPTER_ONLY_RE = /^(chapter|part|unit|lecture|section|appendix|module)\s+([0-9]+|[ivxlcdm]+|[a-z])$/i;
+
+/** All letters uppercase, as in "CHAPTER 3 CELL MEMBRANES". */
+function isAllCaps(text: string): boolean {
+  return /[A-Z]/.test(text) && !/[a-z]/.test(text);
+}
 const NUMBERED_RE = /^\d+(\.\d+)*\.?\s+\S/;
 
 function wordCount(text: string): number {
@@ -91,7 +98,15 @@ export function headingKind(line: Line, profile: Pick<DocumentProfile, 'bodySize
   const ratio = line.fontSize / profile.bodySize;
   // Size first, so a large "Chapter 3" still counts towards heading sizes.
   if (ratio >= HEADING_SIZE_RATIO) return 'size';
-  if (CHAPTER_RE.test(text)) return 'chapter';
+  // "Chapter 3" at body size needs typographic support: otherwise a wrapped
+  // sentence like "Chapter 3 showed how membranes form, and in this" would
+  // become a level-1 heading.
+  if (
+    CHAPTER_RE.test(text) &&
+    (line.bold || ratio >= NUMBERED_HEADING_RATIO || isAllCaps(text) || CHAPTER_ONLY_RE.test(text))
+  ) {
+    return 'chapter';
+  }
   // Bold, body-sized and noticeably shorter than a full line. The width check
   // avoids treating a fully bold sentence that wraps as a heading.
   if (line.bold && line.width < SHORT_LINE_RATIO * profile.lineWidth && wordCount(text) <= 12) return 'bold';
@@ -245,10 +260,15 @@ export function continuesParagraph(prev: Block | undefined, next: Block | undefi
  */
 export function buildBlocks(pages: PageLines[], profile: DocumentProfile): Block[] {
   const blocks: Block[] = [];
+  let prevPage: number | null = null;
   for (const page of pages) {
     const own = pageBlocks(page, profile);
     const last = blocks[blocks.length - 1];
-    if (last?.kind === 'paragraph' && continuesParagraph(last, own[0])) {
+    // Only join across consecutive pages: in a selection like "45-70, 82",
+    // the end of page 70 does not continue on page 82.
+    const consecutive = prevPage !== null && page.page === prevPage + 1;
+    prevPage = page.page;
+    if (consecutive && last?.kind === 'paragraph' && continuesParagraph(last, own[0])) {
       const first = own.shift();
       if (first?.kind === 'paragraph') {
         blocks[blocks.length - 1] = { ...last, text: joinLines(last.text, first.text, profile.hyphens) };
