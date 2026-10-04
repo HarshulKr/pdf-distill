@@ -2,13 +2,13 @@
 
 A Chrome extension that converts PDFs into clean, compact Markdown **locally in your browser**. Keep only the part you need (a chapter, a page range, or the sections relevant to your question), see a before/after token estimate, and paste the result into Claude, ChatGPT or another AI chat.
 
-> **Status: Phase 5 done; Phase 6 in progress.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed, reads scanned pages with on-device OCR, and inserts the result into Claude or ChatGPT. See [Roadmap](#roadmap).
+> **Status: all phases done** (Phase 3 dropped; exact Claude token counts pending an API key, see [Eval results](#eval-results)). Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed, reads scanned pages with on-device OCR, and inserts the result into Claude or ChatGPT. See [Roadmap](#roadmap).
 
 ## Why
 
 Uploading a whole PDF to an AI assistant is expensive. Many assistants process every page as an image plus its text, so a 40-page chapter can cost tens of thousands of tokens even if you only need 5 pages. Sending clean Markdown of just the relevant part uses a fraction of that, which stretches your usage limits further.
 
-Measured on real PDFs (token counts with the cl100k tokenizer; see [DECISIONS.md](DECISIONS.md) D43):
+Estimated on real PDFs (cl100k tokenizer, not exact Claude counts; see [Eval results](#eval-results)):
 
 | | PDF upload (rough) | PDF Distill output |
 | --- | --- | --- |
@@ -58,10 +58,10 @@ For live reload while developing: `npm run dev` (WXT opens a Chrome instance wit
    - or **Copy** / **Download .md** and paste it wherever you like.
 
 The stats bar shows `~before → ~after tokens (est.)`:
-- **Before** is a **rough** estimate of uploading the pages you selected as a PDF: their text plus about 1,568 tokens per page image, because AI apps also send each page as an image. Phase 6 will replace this with measured numbers. **After** is the Markdown. This is the choice you are making: upload the PDF, or paste the Markdown.
+- **Before** is a **rough** estimate of uploading the pages you selected as a PDF: their text plus about 1,568 tokens per page image, because AI apps also send each page as an image. `npm run eval` can measure the real number with an API key (see [Eval results](#eval-results)). **After** is the Markdown. This is the choice you are making: upload the PDF, or paste the Markdown.
 - Underneath is the raw text of the same pages. The Markdown usually costs about the same as that raw text: cleaning removes junk, and headings, lists and page markers add a little back. The difference is that the Markdown is clean and structured.
 - For context, the same numbers are shown for the whole document.
-- Text is counted with the cl100k tokenizer (GPT-4's). Claude's tokenizer is not public, so these are close estimates, not exact Claude counts; Phase 6 measures the difference.
+- Text is counted with the cl100k tokenizer (GPT-4's). Claude's tokenizer is not public, so these are estimates, not exact Claude counts; Anthropic notes cl100k undercounts Claude tokens.
 
 From the command line, the same pipeline runs in Node:
 
@@ -83,6 +83,7 @@ npm run convert -- tests/fixtures/local/scan.pdf "" --ocr   # OCR scanned pages
 | `npm run fixtures` | Regenerate test PDFs in `tests/fixtures/` |
 | `npm run convert -- <pdf> [pages] [--ocr]` | Convert a PDF from the command line |
 | `npm run eval` | Measure exact Claude token counts on real PDFs (needs an API key in `.env`; see `eval/`) |
+| `npm run eval -- --estimates-only` | The same comparison with the extension's own estimates (no API key) |
 
 Golden Markdown files in `tests/golden/` are only rewritten deliberately: `UPDATE_GOLDEN=1 npm test`.
 
@@ -148,11 +149,25 @@ Known non-goals: perfect table and math reconstruction, understanding images/dia
 - ~~Phase 3: question-aware trimming~~ (dropped: not worth the complexity for this tool)
 - [x] Phase 4: OCR for scanned pages
 - [x] Phase 5: insert into Claude / ChatGPT (checked on both live sites)
-- [ ] Phase 6: evaluation with exact token counts
+- [x] Phase 6: evaluation (`npm run eval`): estimates published; exact Claude counts ready to run with an API key
 
 ## Eval results
 
-Filled in after Phase 6.
+`npm run eval` measures seven real PDFs (a textbook chapter, a 62-page paper with tables, a scanned two-column paper, lecture notes, a short paper, a slide deck and a scanned textbook chapter) three ways: uploading the selected pages as a PDF, copy-pasting their raw text, and PDF Distill's Markdown.
+
+**These are estimates, not Claude's exact counts.** Text is counted with the cl100k tokenizer (GPT-4's), and a PDF upload is estimated as text + ~1,568 tokens per page image. Anthropic notes that cl100k undercounts Claude tokens, so absolute numbers are likely low. The comparisons between columns use the same method throughout, so the savings percentages are more reliable than the absolute counts. Full table: [eval/ESTIMATES.md](eval/ESTIMATES.md) (`npm run eval -- --estimates-only`).
+
+| Case | Pages | PDF upload | PDF Distill | Saving vs upload | vs raw text |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Textbook chapter (AIMA ch. 3) | 47 | ~108,700 | ~30,100 | 72% | 14% smaller |
+| Research paper with tables (ATLAS) | 62 | ~174,100 | ~70,500 | 60% | 8% smaller |
+| Two-column scanned paper (IEEE) | 4 | ~12,100 | ~5,500 | 54% | 6% smaller |
+| Lecture notes (CS229 ch. 1) | 12 | ~24,600 | ~5,750 | 77% | 1% smaller |
+| Short paper (arXiv) | 9 | ~20,500 | ~5,600 | 72% | 11% smaller |
+| Slide deck | 22 | ~35,200 | ~800 | 98% | 15% larger |
+| Scanned textbook chapter (Selina, OCR) | 18 | ~41,600 | ~13,200 | 68% | 1% smaller |
+
+**Exact counts.** The same script measures with Claude's own tokenizer through Anthropic's free token-counting API: the selected pages are cut into their own PDF and counted as a real upload (page images included), and the raw text and Markdown are counted as messages. It writes [eval/RESULTS.md](eval/RESULTS.md), including how far off each estimate was. It needs an Anthropic API key in `.env` (git-ignored); this has not been run yet, because the author has no API account (a Claude subscription does not include API access).
 
 ## Decisions
 

@@ -275,3 +275,17 @@ D6's blocky 5x7 shapes OCR poorly ("THE CELL HALL GIVES" for "THE CELL WALL GIVE
   3. Otherwise type it with `execCommand('insertText')` (deprecated, but the only way to type into a rich editor that the editor notices; supported everywhere), or `setRangeText` plus an input event for a textarea.
 - **Never sends.** The user reviews the text and presses Send themselves.
 - **Verified** on four local mock pages (a Claude-like editor that converts long pastes to attachments; a ChatGPT-like editor that ignores synthetic paste, exercising the typing fallback; a textarea; a page with no message box), calling the function rebuilt from its own source text exactly as Chrome serialises it. The live sites can only be tested in the user's own logged-in Chrome; their DOM can change, so Copy stays available and failures say "use Copy".
+
+---
+
+## Phase 6
+
+### D51. Evaluation without exact counts (for now)
+`scripts/eval.ts` (`npm run eval`) measures seven real PDFs three ways: the selected pages uploaded as a PDF (cut into their own PDF with pdf-lib and sent as a document block, so page images are included exactly as in an upload), their raw text, and PDF Distill's Markdown. It uses Claude's token-counting API (free; it does not run the model), subtracts the message wrapper's own tokens, and reports how far each of the extension's estimates was off. The Anthropic SDK is a dev dependency only; it is not in the extension.
+
+It has **not** been run with exact counts: the author has a Claude subscription, which does not include API access, and chose not to open a paid API account. Instead:
+- `--estimates-only` runs the same cases with the extension's own estimates and writes `eval/ESTIMATES.md`, so the README's numbers are reproducible rather than hand-typed.
+- The README labels every number as an estimate, says cl100k undercounts Claude tokens (Anthropic's guidance), and explains that the savings percentages (same method on both sides) are more reliable than the absolute counts.
+- No correction factor is applied. Anthropic's "~15-20% undercount" is a general statement, not a measurement of these PDFs; turning it into a multiplier would present a guess as data.
+
+Running `npm run eval` with an API key in `.env` produces `eval/RESULTS.md` and `eval/results.json` with no code changes.
