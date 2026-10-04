@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { Block } from '../types';
-import { escapeParagraph, markdownFileName, renderMarkdown, tidy } from './render';
+import { escapeParagraph, markdownFileName, renderList, renderMarkdown, tidy } from './render';
 
 const blocks: Block[] = [
   { kind: 'pageBreak', page: 3 },
   { kind: 'heading', level: 2, text: 'Transport', page: 3 },
   { kind: 'paragraph', text: '# not a heading', page: 3 },
-  { kind: 'list', ordered: true, items: ['one', 'two'], page: 3 },
-  { kind: 'list', ordered: false, items: ['a'], page: 3 },
+  {
+    kind: 'list',
+    items: [
+      { text: 'one', depth: 0, number: 1 },
+      { text: 'two', depth: 0, number: 2 },
+    ],
+    page: 3,
+  },
+  { kind: 'list', items: [{ text: 'a', depth: 0 }], page: 3 },
   { kind: 'table', rows: [['Name', 'Value'], ['a|b', '1']], page: 3 },
 ];
 
@@ -61,5 +68,26 @@ describe('escapeParagraph', () => {
   it('leaves ordinary text alone', () => {
     expect(escapeParagraph('3.2 million cells divide')).toBe('3.2 million cells divide');
     expect(escapeParagraph('Plain text - with a dash')).toBe('Plain text - with a dash');
+  });
+});
+
+describe('renderList', () => {
+  it('indents nested items to the parent text and keeps printed numbers', () => {
+    expect(
+      renderList([
+        { text: 'Muscles', depth: 0 },
+        { text: 'Skeletal', depth: 1 },
+        { text: 'Smooth', depth: 1 },
+        { text: 'Review', depth: 0, number: 10 },
+        { text: 'studies', depth: 1 },
+        { text: 'Conclusion', depth: 0, number: 11 },
+      ]),
+    ).toBe(['- Muscles', '  - Skeletal', '  - Smooth', '10. Review', '    - studies', '11. Conclusion'].join('\n'));
+  });
+  it('never indents deeper than one level below the previous item', () => {
+    expect(renderList([{ text: 'a', depth: 2 }])).toBe('- a');
+  });
+  it('escapes item text', () => {
+    expect(renderList([{ text: '# not a heading', depth: 0 }])).toBe('- \\# not a heading');
   });
 });

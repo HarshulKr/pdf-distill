@@ -15,6 +15,9 @@ import type { Line, PageContent, PageLines, TextItem } from '../types';
  */
 const SAME_LINE_TOLERANCE = 0.5;
 
+/** See groupLines: caps how much a large item can widen the same-line tolerance. */
+const MAX_SIZE_SPREAD = 1.5;
+
 /** A horizontal gap wider than this fraction of the font size becomes a space. */
 const SPACE_GAP = 0.15;
 
@@ -103,7 +106,11 @@ export function groupLines(items: TextItem[]): Line[] {
   let currentY = 0;
   let currentSize = 0;
   for (const item of sorted) {
-    const tolerance = SAME_LINE_TOLERANCE * Math.max(currentSize, item.fontSize);
+    // Base the tolerance on the larger size, but at most 1.5x the smaller:
+    // otherwise one oversized glyph (a 25pt margin icon beside 11pt text)
+    // widens the tolerance enough to swallow the next line.
+    const small = Math.min(currentSize, item.fontSize);
+    const tolerance = SAME_LINE_TOLERANCE * Math.min(Math.max(currentSize, item.fontSize), MAX_SIZE_SPREAD * small);
     if (current.length > 0 && Math.abs(item.y - currentY) <= tolerance) {
       current.push(item);
       // Track the largest item so a run of small superscripts can't drift the line.

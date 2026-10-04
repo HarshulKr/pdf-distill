@@ -4,14 +4,16 @@
 // synchronous function that is easy to test.
 
 import { LOW_TEXT_CHARS } from './extract/extract';
-import { findRunningLines, removeHeadersAndFooters } from './clean/headers';
+import { removeFigureLabels } from './clean/figures';
+import { findFolioOffsets, findRunningLines, removeHeadersAndFooters } from './clean/headers';
+import { removeMarginNotes } from './layout/margins';
 import { looksMultiColumn, pageToLines } from './layout/lines';
 import { renderMarkdown } from './markdown/render';
 import { sectionsInSelection } from './outline/outline';
 import { formatPageList } from './pages/range';
 import { buildBlocks, buildProfile } from './structure/structure';
 import { estimateRawPdfUploadTokens, estimateTokens, estimateTokensFromChars } from './tokens/estimate';
-import type { ConversionResult, PageContent, PageLines, Section } from './types';
+import type { ConversionResult, ConversionStats, PageContent, PageLines, Section } from './types';
 
 export interface ConvertOptions {
   pageMarkers: boolean;
@@ -37,6 +39,20 @@ export interface ConvertInput {
   wholeDocument?: WholeDocumentCount | null;
   /** The document's chapters, if known; the ones overlapping the selection are returned. */
   sections?: Section[];
+}
+
+/** "12 header/footer lines, 30 margin notes, 25 figure labels" (non-zero parts only). */
+export function removedSummary(stats: Pick<ConversionStats, 'removedLines' | 'removedMarginNotes' | 'removedFigureLines'>): string {
+  const parts = [
+    [stats.removedLines, 'header/footer line'],
+    [stats.removedMarginNotes, 'margin note'],
+    [stats.removedFigureLines, 'figure label'],
+  ] as const;
+  const text = parts
+    .filter(([n]) => n > 0)
+    .map(([n, what]) => `${n.toLocaleString('en-US')} ${what}${n === 1 ? '' : 's'}`)
+    .join(', ');
+  return text || 'nothing';
 }
 
 /** "page 12" or "pages 4-9, 12". */
@@ -81,16 +97,27 @@ export function rawTextChars(pages: PageLines[]): number {
 
 export function convert(input: ConvertInput): ConversionResult {
   const selectedSet = new Set(input.selected);
-  const allLines = input.pages.map(pageToLines);
+  const isSelected = (p: { page: number }): boolean => selectedSet.has(p.page);
+
+  // Margin notes go first: they share baselines with body text, so they must
+  // be removed before items are grouped into lines.
+  const margins = removeMarginNotes(input.pages);
+  const itemsBefore = new Map(input.pages.map((p) => [p.page, p.items.length]));
+  const marginNotes = margins.pages
+    .filter(isSelected)
+    .reduce((n, p) => n + (itemsBefore.get(p.page) ?? 0) - p.items.length, 0);
+  const allLines = margins.pages.map(pageToLines);
 
   // Header/footer detection and the profile use the whole sample.
   const running = findRunningLines(allLines);
-  const cleanedAll = removeHeadersAndFooters(allLines, running);
+  const folios = findFolioOffsets(allLines);
+  const cleanedAll = removeFigureLabels(removeHeadersAndFooters(allLines, running, folios).pages);
   const profile = buildProfile(cleanedAll.pages);
 
-  const selectedLines = allLines.filter((p) => selectedSet.has(p.page));
-  const cleaned = removeHeadersAndFooters(selectedLines, running);
-  const blocks = buildBlocks(cleaned.pages, profile);
+  const selectedLines = allLines.filter(isSelected);
+  const headers = removeHeadersAndFooters(selectedLines, running, folios);
+  const figures = removeFigureLabels(headers.pages);
+  const blocks = buildBlocks(figures.pages, profile);
 
   const markdown = renderMarkdown(blocks, {
     pageMarkers: input.options.pageMarkers,
@@ -111,14 +138,15 @@ export function convert(input: ConvertInput): ConversionResult {
       `${capitalisedPagesLabel(lowText)} ${one ? 'has' : 'have'} no text layer (probably scanned images), so ${one ? 'it is' : 'they are'} missing from the output. OCR support is planned.`,
     );
   }
-  const columns = selectedLines.filter((p) => looksMultiColumn(p)).map((p) => p.page);
+  const columns = figures.pages.filter((p) => looksMultiColumn(p)).map((p) => p.page);
   if (columns.length) {
     warnings.push(
       `${capitalisedPagesLabel(columns)} ${columns.length === 1 ? 'seems' : 'seem'} to have columns or a table. Their text may be in the wrong order; check those parts before relying on them.`,
     );
   }
 
-  const charsSelected = rawTextChars(selectedLines);
+  // Raw = as extracted, margin notes included.
+  const charsSelected = rawTextChars(input.pages.filter(isSelected).map(pageToLines));
   const tokensSelected = estimateTokensFromChars(charsSelected);
 
   return {
@@ -132,7 +160,9 @@ export function convert(input: ConvertInput): ConversionResult {
       ...beforeStats(input.wholeDocument),
       charsAfter: markdown.length,
       tokensAfter: estimateTokens(markdown),
-      removedLines: cleaned.removed,
+      removedLines: headers.removed,
+      removedMarginNotes: marginNotes,
+      removedFigureLines: figures.removed,
     },
     warnings,
   };

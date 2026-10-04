@@ -88,7 +88,11 @@ describe('font names', () => {
     ['Helvetica-Bold', true],
     ['ABCDEF+Minion-Semibold', true],
     ['Arial-BlackItalic', true],
+    ['VJFDLE+CMSSBX10', true],
+    ['CMBX12', true],
     ['Times-Roman', false],
+    ['CMR10', false],
+    ['Boxed', false],
     ['g_d0_f1', false],
   ])('isBoldFontName(%s) = %s', (name, expected) => {
     expect(isBoldFontName(name)).toBe(expected);

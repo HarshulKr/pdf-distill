@@ -9,6 +9,7 @@ import {
   distinctSizes,
   headingKind,
   headingLevel,
+  listMarker,
   startsParagraph,
   type DocumentProfile,
 } from './structure';
@@ -192,5 +193,71 @@ describe('continuesParagraph', () => {
     expect(continuesParagraph(p('and so'), p('On'))).toBe(false);
     expect(continuesParagraph(p('done.'), p('on'))).toBe(false);
     expect(continuesParagraph(undefined, p('on'))).toBe(false);
+  });
+});
+
+describe('lists', () => {
+  it('listMarker reads bullets, numbers and labels', () => {
+    expect(listMarker(line('• A set of states'))).toMatchObject({ text: 'A set of states' });
+    expect(listMarker(line('- item text'))).toMatchObject({ text: 'item text' });
+    expect(listMarker(line('3. Conclusion'))).toMatchObject({ text: 'Conclusion', number: 3 });
+    expect(listMarker(line('1.The degrees of freedom'))).toMatchObject({ text: 'The degrees of freedom', number: 1 });
+    expect(listMarker(line('(a) first case'))).toMatchObject({ text: '(a) first case' });
+    expect(listMarker(line('3.2 Transport'))).toBeNull();
+    expect(listMarker(line('—an abstract model'))).toBeNull();
+    expect(listMarker(line('1.5 million cells'))).toBeNull();
+  });
+
+  it('joins hanging-indent continuations and ends the list at an indented paragraph', () => {
+    // Russell & Norvig: bullet at x=70, item text at ~x=79, paragraphs indent to x=72.
+    const pages = [
+      pageLines(1, [
+        { text: '• Goal formulation: The agent adopts the goal of reaching Bucharest.', x: 70, y: 100 },
+        { text: 'Goals organize behavior by limiting the objectives.', x: 79, y: 114 },
+        { text: '• Search: Before taking any action in the real world, the agent', x: 70, y: 128 },
+        { text: 'simulates sequences of actions in its model.', x: 79, y: 142 },
+        { text: 'A new paragraph starts with a first-line indent here and goes on', x: 72, y: 160 },
+        { text: 'for a while as ordinary body text does in a textbook.', x: 54, y: 174 },
+      ]),
+    ];
+    const blocks = buildBlocks(pages, buildProfile(pages));
+    expect(blocks.slice(1)).toEqual([
+      {
+        kind: 'list',
+        items: [
+          { text: 'Goal formulation: The agent adopts the goal of reaching Bucharest. Goals organize behavior by limiting the objectives.', depth: 0 },
+          { text: 'Search: Before taking any action in the real world, the agent simulates sequences of actions in its model.', depth: 0 },
+        ],
+        page: 1,
+      },
+      {
+        kind: 'paragraph',
+        text: 'A new paragraph starts with a first-line indent here and goes on for a while as ordinary body text does in a textbook.',
+        page: 1,
+      },
+    ]);
+  });
+
+  it('nests by marker position and joins lowercase wraps back at the marker', () => {
+    const pages = [
+      pageLines(1, [
+        { text: '• Three types:', x: 388, y: 100 },
+        { text: '• Skeletal: Voluntary control', x: 419, y: 120 },
+        { text: '• Smooth: Involuntary control (body', x: 419, y: 140 },
+        { text: 'organs)', x: 419, y: 160 },
+        { text: '• Back to the top level', x: 388, y: 180 },
+      ]),
+    ];
+    const list = buildBlocks(pages, buildProfile(pages))[1];
+    expect(list).toEqual({
+      kind: 'list',
+      items: [
+        { text: 'Three types:', depth: 0 },
+        { text: 'Skeletal: Voluntary control', depth: 1 },
+        { text: 'Smooth: Involuntary control (body organs)', depth: 1 },
+        { text: 'Back to the top level', depth: 0 },
+      ],
+      page: 1,
+    });
   });
 });

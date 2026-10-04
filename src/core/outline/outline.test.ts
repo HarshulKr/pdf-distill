@@ -137,6 +137,25 @@ describe('sectionsFromHeadings', () => {
       { title: 'Chapter 2 Membranes', level: 1, startPage: 6, endPage: 9 },
     ]);
   });
+  it('merges a title repeated on consecutive slides into one section', () => {
+    const sections = sectionsFromHeadings(
+      [
+        { page: 1, text: 'Muscles', size: 40 },
+        { page: 2, text: 'Active tension', size: 30 },
+        { page: 3, text: 'Active tension', size: 30 },
+        { page: 4, text: 'Active tension', size: 30 },
+        { page: 5, text: 'Total tension', size: 30 },
+      ],
+      20,
+      6,
+    );
+    expect(sections.map((s) => [s.title, s.startPage, s.endPage])).toEqual([
+      ['Muscles', 1, 6],
+      ['Active tension', 2, 4],
+      ['Total tension', 5, 6],
+    ]);
+  });
+
   it('returns [] when nothing stands out', () => {
     expect(sectionsFromHeadings([{ page: 1, text: 'Small', size: 11 }], 10, 3)).toEqual([]);
   });

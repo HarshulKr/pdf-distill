@@ -71,8 +71,12 @@ function isTextItem(item: PdfTextContentItem): item is PdfTextItemLike {
   return 'str' in item;
 }
 
-/** Font weight words used in PostScript font names, e.g. "Minion-Semibold". */
-const BOLD_FONT_RE = /bold|black|heavy|semibold|demi/i;
+/**
+ * Font weight words used in PostScript font names, e.g. "Minion-Semibold".
+ * TeX fonts say "bold extended" as BX plus a design size: CMBX12, CMSSBX10,
+ * SFBX1000.
+ */
+const BOLD_FONT_RE = /bold|black|heavy|semibold|demi|bx(\d|$)/i;
 
 export function isBoldFontName(fontName: string): boolean {
   return BOLD_FONT_RE.test(fontName);

@@ -2,7 +2,7 @@
 // pure pipeline (src/core). All processing happens here, in the panel page,
 // never in the service worker.
 
-import { beforeStats, convert, pagesLabel, type WholeDocumentCount } from '@/core/convert';
+import { beforeStats, convert, pagesLabel, removedSummary, type WholeDocumentCount } from '@/core/convert';
 import { CancelledError, countDocumentText, extractPages } from '@/core/extract/extract';
 import { markdownFileName } from '@/core/markdown/render';
 import { pagesOfSections, sectionsFromHeadings, sectionsFromOutline } from '@/core/outline/outline';
@@ -331,7 +331,7 @@ function renderStats(): void {
   const pages = `${stats.pages.toLocaleString()} ${stats.pages === 1 ? 'page' : 'pages'}`;
   const perImage = `~${RAW_PDF_IMAGE_TOKENS_PER_PAGE.toLocaleString('en-US')} per page image`;
   const parts: string[] = [
-    `Before = raw text of the ${pages} you selected; ${stats.removedLines.toLocaleString()} header/footer/page-number lines removed.`,
+    `Before = raw text of the ${pages} you selected. Removed: ${removedSummary(stats)}.`,
     `Uploading these ${pages} as a PDF would cost roughly ${formatTokenEstimate(stats.rawUploadTokensSelected)} (text + ${perImage}).`,
   ];
   const whole = beforeStats(state.whole);

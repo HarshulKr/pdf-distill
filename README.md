@@ -2,11 +2,21 @@
 
 A Chrome extension that converts PDFs into clean, compact Markdown **locally in your browser**. Keep only the part you need (a chapter, a page range, or the sections relevant to your question), see a before/after token estimate, and paste the result into Claude, ChatGPT or another AI chat.
 
-> **Status: Phase 2 in progress.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed. Lists, tables and columns are still to come in Phase 2. See [Roadmap](#roadmap).
+> **Status: Phase 2 in progress.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed. Tables and two-column pages are still to come. See [Roadmap](#roadmap).
 
 ## Why
 
 Uploading a whole PDF to an AI assistant is expensive. Many assistants process every page as an image plus its text, so a 40-page chapter can cost tens of thousands of tokens even if you only need 5 pages. Sending clean Markdown of just the relevant part uses a fraction of that, which stretches your usage limits further.
+
+Measured on real PDFs (estimates; see [DECISIONS.md](DECISIONS.md) D34):
+
+| | PDF upload (rough) | PDF Distill output |
+| --- | --- | --- |
+| Textbook chapter (AIMA ch. 3, 47 pages) | ~107,600 tokens | ~32,800 tokens |
+| Lecture notes (CS229 ch. 1, 12 pages) | ~23,500 tokens | ~5,000 tokens |
+| Slide deck (22 slides) | ~35,200 tokens | ~840 tokens |
+
+Compared with copy-pasting the raw text, the output costs about the same, but it is clean: running headers, page numbers, margin notes and figure labels are removed, and headings, paragraphs and lists are restored.
 
 ## Privacy
 
@@ -70,16 +80,21 @@ Golden Markdown files in `tests/golden/` are only rewritten deliberately: `UPDAT
 Each step is pure TypeScript in `src/core/`, unit tested in Node. Steps marked *(later)* arrive in later phases.
 
 1. **Extract** (`extract/`): pdf.js text items with positions, font sizes and real font names (for bold). Pages with almost no text are flagged.
-2. **Lines** (`layout/`): items are grouped into lines by baseline and sorted top to bottom, with spaces inserted at visual gaps. Two-column handling is *(later)*; for now such pages get a warning.
+2. **Lines** (`layout/`):
+   - Margin notes (small text beside the main column on many pages, like a textbook's glossary terms) are removed first.
+   - Items are grouped into lines by baseline and sorted top to bottom, with spaces inserted at visual gaps.
+   - Two-column handling is *(later)*; for now such pages get a warning.
 3. **Clean** (`clean/`):
    - Running headers and footers are lines in the top or bottom 8% of the page that repeat on more than 40% of the pages within ±15 of your selection, or on 3 pages close together (for headers that change every chapter or section).
-   - Page numbers ("12", "xiv", "Page 3 of 40") in those zones are removed.
+   - Page numbers ("12", "xiv", "Page 3 of 40") in those zones are removed, and so are headers that carry the page number ("Section 3.1 Problem-Solving Agents 83") even when their text changes every section.
+   - Labels inside diagrams (a run of short fragments directly above a "Figure 3.1" caption) are removed; the caption stays.
    - Words split across lines are rejoined, using evidence from the document to keep real compounds like "water-fearing".
 4. **Structure** (`structure/`):
    - Body font size is the most common size.
    - Headings are lines ≥1.2× that size, or short bold lines, or "Chapter 3" / "3.2 Title" patterns; sizes map to levels 1–3.
    - Paragraphs are split on larger vertical gaps or indented first lines, and joined across page breaks.
-   - Lists and tables are *(later)*.
+   - Bulleted and numbered lists, including nested ones and items whose lines wrap with a hanging indent.
+   - Tables are *(later)*.
 5. **Chapters** (`outline/`): from the PDF's bookmarks, or, without bookmarks, from large headings found during the whole-document count. Ticking chapters fills in the page range.
 6. **Markdown** (`markdown/`): a source line, optional `<!-- page N -->` markers, headings and paragraphs, with blank lines collapsed.
 7. **Tokens** (`tokens/`): before/after estimates.
@@ -99,10 +114,12 @@ tests/golden/      expected Markdown for fixtures
 
 ## Limitations
 
-Current (Phase 1):
+Current:
 
-- **Two-column pages and tables are read straight across**, so their text can be interleaved. These pages get a warning. Phase 2 adds column and table handling.
-- **Lists** become paragraphs, and list items with hanging indents may split. Phase 2 fixes this.
+- **Two-column pages and tables are read straight across**, so their text can be interleaved. These pages get a warning. Column and table handling is postponed until it can be tested on real two-column PDFs.
+- **Margin notes are dropped.** In the textbooks tested they repeat a nearby term, but a book whose margin holds unique content will lose it. Margin text in the body font size is never dropped.
+- **Math** comes out as flattened text (e.g. `J(θ) = (hθ(x(i)) − y(i))2`).
+- **Footnotes** stay where they are printed, as plain paragraphs.
 - **Code blocks** (monospace text) are merged into paragraphs, losing their line breaks.
 - **Scanned pages** (no text layer) are skipped with a warning. OCR is Phase 4.
 - **Page markers** are exact for where a paragraph starts, but a paragraph that runs onto the next page is kept whole before the next page's marker.

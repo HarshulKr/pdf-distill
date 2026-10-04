@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { beforeStats, convert, pagesLabel } from './convert';
+import { beforeStats, convert, pagesLabel, removedSummary } from './convert';
 import { bodyLines, item, page } from './testing';
 import type { PageContent } from './types';
 
@@ -72,5 +72,12 @@ describe('pagesLabel', () => {
   it('uses singular and plural', () => {
     expect(pagesLabel([4])).toBe('page 4');
     expect(pagesLabel([4, 5, 6, 9])).toBe('pages 4-6, 9');
+  });
+});
+
+describe('removedSummary', () => {
+  it('lists non-zero parts with plurals', () => {
+    expect(removedSummary({ removedLines: 12, removedMarginNotes: 1, removedFigureLines: 0 })).toBe('12 header/footer lines, 1 margin note');
+    expect(removedSummary({ removedLines: 0, removedMarginNotes: 0, removedFigureLines: 0 })).toBe('nothing');
   });
 });

@@ -6,6 +6,7 @@
  *   npm run convert -- tests/fixtures/local/bio.pdf "45-70, 82"
  */
 import { writeFile } from 'node:fs/promises';
+import { removedSummary } from '../src/core/convert';
 import { convertPdf } from './lib/node-pdf';
 
 async function main(): Promise<void> {
@@ -26,7 +27,10 @@ async function main(): Promise<void> {
   else process.stdout.write(result.markdown);
   const s = result.stats;
   console.error(
-    `\n[${s.pages} pages in ${ms} ms] whole-doc text ~${s.tokensBefore ?? '?'} tokens (est.), raw PDF upload ~${s.rawUploadTokensBefore ?? '?'} (rough) -> output ~${s.tokensAfter} (est.); ${s.removedLines} header/footer lines removed`,
+    `\n[${s.pages} pages in ${ms} ms] selected pages raw ~${s.tokensSelected} tokens -> output ~${s.tokensAfter} (est.); ` +
+      `uploading them as a PDF ~${s.rawUploadTokensSelected} (rough)\n` +
+      `removed: ${removedSummary(result.stats)}\n` +
+      `whole document: ~${s.tokensBefore ?? '?'} tokens of text, ~${s.rawUploadTokensBefore ?? '?'} as a PDF upload (rough)`,
   );
   for (const w of result.warnings) console.error(`warning: ${w}`);
 }

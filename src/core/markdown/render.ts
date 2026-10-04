@@ -1,6 +1,6 @@
 // Blocks -> Markdown string.
 
-import type { Block } from '../types';
+import type { Block, ListItem } from '../types';
 
 export interface RenderOptions {
   /** Emit `<!-- page N -->` before each page so the AI can cite pages. */
@@ -26,6 +26,25 @@ function escapeTableCell(text: string): string {
   return text.replace(/\|/g, '\\|');
 }
 
+/**
+ * Render list items. A nested item is indented to where its parent's text
+ * starts ("- " = 2 spaces, "10. " = 4), which is what CommonMark needs to
+ * nest it.
+ */
+export function renderList(items: ListItem[]): string {
+  const markerWidths: number[] = []; // by depth: width of the latest marker
+  return items
+    .map((item) => {
+      const depth = Math.min(item.depth, markerWidths.length);
+      const marker = item.number === undefined ? '-' : `${item.number}.`;
+      const indent = markerWidths.slice(0, depth).reduce((n, w) => n + w, 0);
+      markerWidths.length = depth;
+      markerWidths.push(marker.length + 1);
+      return `${' '.repeat(indent)}${marker} ${escapeParagraph(item.text)}`;
+    })
+    .join('\n');
+}
+
 export function renderBlock(block: Block, options: RenderOptions): string {
   switch (block.kind) {
     case 'heading':
@@ -33,7 +52,7 @@ export function renderBlock(block: Block, options: RenderOptions): string {
     case 'paragraph':
       return escapeParagraph(block.text);
     case 'list':
-      return block.items.map((item, i) => (block.ordered ? `${i + 1}. ${item}` : `- ${item}`)).join('\n');
+      return renderList(block.items);
     case 'table': {
       const [header, ...rows] = block.rows;
       if (!header) return '';

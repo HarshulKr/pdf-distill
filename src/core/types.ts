@@ -54,9 +54,18 @@ export interface PageLines {
 export type Block =
   | { kind: 'heading'; level: 1 | 2 | 3; text: string; page: number }
   | { kind: 'paragraph'; text: string; page: number }
-  | { kind: 'list'; ordered: boolean; items: string[]; page: number }
+  | { kind: 'list'; items: ListItem[]; page: number }
   | { kind: 'table'; rows: string[][]; page: number }
   | { kind: 'pageBreak'; page: number };
+
+/** One list item. Items of different depths and kinds can mix (a numbered list with bullets inside). */
+export interface ListItem {
+  text: string;
+  /** 0 = top level. */
+  depth: number;
+  /** The printed number for numbered items ("3." -> 3); undefined for bullets. */
+  number?: number;
+}
 
 export interface Section {
   title: string;
@@ -88,7 +97,12 @@ export interface ConversionStats {
   rawUploadTokensBefore: number | null;
   charsAfter: number;
   tokensAfter: number;
+  /** Running header/footer and page-number lines removed from the selection. */
   removedLines: number;
+  /** Margin-note text items removed (see layout/margins.ts). */
+  removedMarginNotes: number;
+  /** Figure label lines removed (see clean/figures.ts). */
+  removedFigureLines: number;
 }
 
 export interface ConversionResult {

@@ -134,13 +134,20 @@ export function sectionsFromHeadings(candidates: HeadingCandidate[], bodySize: n
   const sizes = [...new Set(kept.map((c) => c.size))].sort((a, b) => b - a).slice(0, MAX_SECTION_LEVEL);
   const entries: OutlineEntry[] = [];
   const seen = new Set<string>();
+  const lastTitleAt = new Map<number, string>(); // level -> latest title
   for (const c of kept) {
     const level = sizes.indexOf(c.size) + 1;
     if (level === 0) continue;
     const key = `${c.page}:${level}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    entries.push({ title: c.text, level, page: c.page });
+    // Slides repeat a title across consecutive slides ("Active tension" x4);
+    // skipping the repeats lets the first one's section run on.
+    const title = cleanTitle(c.text);
+    if (lastTitleAt.get(level)?.toLowerCase() === title.toLowerCase()) continue;
+    lastTitleAt.set(level, title);
+    for (const deeper of [...lastTitleAt.keys()]) if (deeper > level) lastTitleAt.delete(deeper);
+    entries.push({ title, level, page: c.page });
   }
   return sectionsFromEntries(entries, numPages);
 }

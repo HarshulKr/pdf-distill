@@ -6,7 +6,7 @@
 
 import { collectEvidence, joinLines, type HyphenEvidence } from '../clean/hyphenation';
 import { roundSize } from '../layout/lines';
-import type { Block, Line, PageLines } from '../types';
+import type { Block, Line, ListItem, PageLines } from '../types';
 
 export interface DocumentProfile {
   /** Most common font size, weighted by characters. */
@@ -195,26 +195,145 @@ interface OpenText {
   last: Line;
 }
 
+// ---------------------------------------------------------------- lists
+
+/** Bullet glyphs. Dashes and "*" also count, but only when followed by a space. */
+const BULLET_RE = /^([•●◦▪▫■□‣⁃∙○◆◇➢➤►▶✓✔])\s*(\S.*)$/u;
+const DASH_BULLET_RE = /^([-–—*])\s+(\S.*)$/;
+/** "3. Text", "3) Text", and "3.Text" when a capital follows (slides often omit the space). */
+const NUMBERED_ITEM_RE = /^(\d{1,2})[.)](?:\s+|(?=[A-Z(]))(\S.*)$/;
+/** "(a) Text", "(iv) Text", "a) Text": kept as bullets with their label, since Markdown has no lettered lists. */
+const LABELLED_ITEM_RE = /^(\((?:[a-z]|[ivx]{1,4}|\d{1,2})\)|[a-z]\))\s+(\S.*)$/;
+
+export interface ListMarker {
+  /** Item text without the marker. */
+  text: string;
+  number?: number;
+  /** Where the item's text starts; continuation lines align with this. */
+  textX: number;
+}
+
+/**
+ * The list marker a line starts with, if any. The text position comes from
+ * the second item when the marker is its own text item (common for bullet
+ * glyphs), otherwise it is estimated from the marker's length.
+ */
+export function listMarker(line: Line): ListMarker | null {
+  const text = line.text;
+  let m = BULLET_RE.exec(text) ?? DASH_BULLET_RE.exec(text);
+  let number: number | undefined;
+  let body: string | undefined;
+  let markerChars = 0;
+  if (m) {
+    body = m[2];
+    markerChars = text.length - (body?.length ?? 0);
+  } else if ((m = NUMBERED_ITEM_RE.exec(text))) {
+    number = Number(m[1]);
+    body = m[2];
+    markerChars = text.length - (body?.length ?? 0);
+  } else if ((m = LABELLED_ITEM_RE.exec(text))) {
+    body = text; // keep "(a)" in the text
+    markerChars = (m[1]?.length ?? 0) + 1;
+  }
+  if (body === undefined) return null;
+  const [first, second] = line.items;
+  const separateMarker = first && second && first.str.trim().length < markerChars + 1 && first.str.trim() !== text;
+  const textX = separateMarker ? second.x : line.x + markerChars * 0.5 * line.fontSize;
+  return { text: body, textX, ...(number === undefined ? {} : { number }) };
+}
+
+interface OpenItem {
+  text: string;
+  depth: number;
+  number?: number;
+  textX: number;
+  /** Where the marker itself starts. */
+  markerX: number;
+  last: Line;
+}
+
+function openItem(marker: ListMarker, line: Line, depth: number): OpenItem {
+  return {
+    text: marker.text,
+    depth,
+    textX: marker.textX,
+    markerX: line.x,
+    last: line,
+    ...(marker.number === undefined ? {} : { number: marker.number }),
+  };
+}
+
+function toListItem(item: OpenItem): ListItem {
+  return { text: item.text, depth: item.depth, ...(item.number === undefined ? {} : { number: item.number }) };
+}
+
+/**
+ * Does `line` continue the open list item? Either it is aligned with the
+ * item's text (a hanging indent), or it wraps back to the marker's position
+ * mid-sentence: the item so far has no sentence end and the line starts in
+ * lowercase.
+ */
+export function continuesItem(item: OpenItem, line: Line, profile: DocumentProfile): boolean {
+  const gap = line.y - item.last.y;
+  if (gap <= 0 || gap > Math.max(PARAGRAPH_GAP_RATIO * profile.lineGap, 1.6 * line.fontSize)) return false;
+  const tolerance = 0.6 * line.fontSize;
+  if (Math.abs(line.x - item.textX) <= tolerance) return true;
+  return Math.abs(line.x - item.markerX) <= tolerance && !SENTENCE_END_RE.test(item.text) && /^[a-z(]/.test(line.text);
+}
+
 /** Headings and paragraphs of one page, in reading order. */
 export function pageBlocks(page: PageLines, profile: DocumentProfile): Block[] {
   const blocks: Block[] = [];
   // At most one of these is open at a time.
-  const open: { para: OpenText | null; heading: (OpenText & { level: 1 | 2 | 3 }) | null } = {
-    para: null,
-    heading: null,
-  };
+  const open: {
+    para: OpenText | null;
+    heading: (OpenText & { level: 1 | 2 | 3 }) | null;
+    /** Finished items, the item being built, and the marker x of each nesting level. */
+    list: { items: ListItem[]; item: OpenItem; markerXs: number[] } | null;
+  } = { para: null, heading: null, list: null };
 
   const flush = (): void => {
     if (open.para) blocks.push({ kind: 'paragraph', text: open.para.text, page: page.page });
     if (open.heading) {
       blocks.push({ kind: 'heading', level: open.heading.level, text: open.heading.text, page: page.page });
     }
+    if (open.list) {
+      const { items, item } = open.list;
+      blocks.push({ kind: 'list', items: [...items, toListItem(item)], page: page.page });
+    }
     open.para = null;
     open.heading = null;
+    open.list = null;
   };
 
   for (const line of page.lines) {
     const kind = headingKind(line, profile);
+    const marker = listMarker(line);
+    // A marker wins over bold/numbered heading rules ("1. Introduction" on a
+    // slide is an item), but not over a clearly larger heading.
+    if (marker && kind !== 'size' && kind !== 'chapter') {
+      const tolerance = 0.5 * line.fontSize;
+      if (!open.list) {
+        flush();
+        open.list = { items: [], item: openItem(marker, line, 0), markerXs: [line.x] };
+        continue;
+      }
+      const xs = open.list.markerXs;
+      while (xs.length > 1 && line.x < (xs[xs.length - 1] ?? 0) - tolerance) xs.pop();
+      if (line.x > (xs[xs.length - 1] ?? 0) + tolerance) xs.push(line.x);
+      open.list.items.push(toListItem(open.list.item));
+      open.list.item = openItem(marker, line, xs.length - 1);
+      continue;
+    }
+    const item = open.list?.item;
+    // A short bold line can be the wrapped end of a bold item ("(body" /
+    // "organs)"), so only clearly larger headings interrupt an item.
+    if (item && kind !== 'size' && kind !== 'chapter' && continuesItem(item, line, profile)) {
+      item.text = joinLines(item.text, line.text, profile.hyphens);
+      item.last = line;
+      continue;
+    }
+    if (open.list) flush();
     if (kind) {
       const level = headingLevel(line, kind, profile);
       const h = open.heading;

@@ -116,23 +116,96 @@ export function isPageNumberText(text: string): boolean {
   return false;
 }
 
+// ---------------------------------------------------------------- folios
+
+/**
+ * Headers that carry the printed page number ("Section 3.1 Problem-Solving
+ * Agents 83", "84 Chapter 3 ...") change their text every section, so
+ * repetition can't find them. The page number can: it starts or ends the
+ * page's first or last line and equals the PDF page number plus a fixed
+ * offset (front matter shifts printed numbers) on page after page.
+ */
+export interface FolioOptions {
+  /** First/last lines must lie in this top/bottom fraction. Wider than edgeZone: LaTeX puts folios ~13% down. */
+  zone: number;
+  /** An offset must hold on this fraction of sampled pages... */
+  minFraction: number;
+  /** ...and at least this many pages. */
+  minPages: number;
+}
+
+export const DEFAULT_FOLIO_OPTIONS: FolioOptions = { zone: 0.15, minFraction: 0.3, minPages: 3 };
+
+/** Numbers at the start or end of a line ("84 Chapter 3", "Agents 83", "10"). */
+export function edgeNumbers(text: string): number[] {
+  const out: number[] = [];
+  const start = /^(\d{1,4})\b/.exec(text.trim());
+  const end = /\b(\d{1,4})$/.exec(text.trim());
+  if (start?.[1]) out.push(Number(start[1]));
+  if (end?.[1] && end.index > 0) out.push(Number(end[1]));
+  return out;
+}
+
+/** The page's first and last lines, if they lie in the folio zones. */
+function folioCandidates(page: PageLines, zone: number): Line[] {
+  const first = page.lines[0];
+  const last = page.lines[page.lines.length - 1];
+  const out: Line[] = [];
+  if (first && first.y - first.fontSize <= zone * page.height) out.push(first);
+  if (last && last !== first && last.y >= (1 - zone) * page.height) out.push(last);
+  return out;
+}
+
+/** Offsets (printed number - PDF page number) that hold across the sample. */
+export function findFolioOffsets(pages: PageLines[], options: FolioOptions = DEFAULT_FOLIO_OPTIONS): Set<number> {
+  const counts = new Map<number, number>();
+  for (const page of pages) {
+    const offsets = new Set<number>();
+    for (const line of folioCandidates(page, options.zone)) {
+      for (const n of edgeNumbers(line.text)) offsets.add(n - page.page);
+    }
+    for (const offset of offsets) counts.set(offset, (counts.get(offset) ?? 0) + 1);
+  }
+  const found = new Set<number>();
+  for (const [offset, count] of counts) {
+    if (count >= options.minPages && count >= options.minFraction * pages.length) found.add(offset);
+  }
+  return found;
+}
+
+function isFolioLine(line: Line, page: PageLines, offsets: Set<number>): boolean {
+  return edgeNumbers(line.text).some((n) => offsets.has(n - page.page));
+}
+
+// ---------------------------------------------------------------- removal
+
 export interface RemovalResult {
   pages: PageLines[];
   removed: number;
 }
 
-/** Remove running headers/footers and page-number lines from the edge zones. */
+/**
+ * Remove running headers/footers and page-number lines from the edge zones,
+ * plus first/last lines that carry the page number (see findFolioOffsets).
+ */
 export function removeHeadersAndFooters(
   pages: PageLines[],
   running: Set<string>,
+  folioOffsets: Set<number> = new Set(),
   options: HeaderFooterOptions = DEFAULT_HEADER_FOOTER_OPTIONS,
+  folioOptions: FolioOptions = DEFAULT_FOLIO_OPTIONS,
 ): RemovalResult {
   let removed = 0;
   const out = pages.map((page) => {
+    const folios = new Set(
+      folioOffsets.size ? folioCandidates(page, folioOptions.zone).filter((l) => isFolioLine(l, page, folioOffsets)) : [],
+    );
     const lines = page.lines.filter((line) => {
+      let drop = folios.has(line);
       const zone = edgeZoneOf(line, page.height, options.edgeZone);
-      if (!zone) return true;
-      const drop = running.has(`${zone}:${normalizeEdgeLine(line.text)}`) || isPageNumberText(line.text);
+      if (!drop && zone) {
+        drop = running.has(`${zone}:${normalizeEdgeLine(line.text)}`) || isPageNumberText(line.text);
+      }
       if (drop) removed += 1;
       return !drop;
     });

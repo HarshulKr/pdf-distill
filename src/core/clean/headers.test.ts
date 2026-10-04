@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { line, PAGE_H, pageLines } from '../testing';
 import type { PageLines } from '../types';
 import {
+  edgeNumbers,
   edgeZoneOf,
+  findFolioOffsets,
   findRunningLines,
   hasNearbyRun,
   isPageNumberText,
@@ -118,5 +120,52 @@ describe('hasNearbyRun', () => {
     expect(hasNearbyRun([10, 13, 17], 3, 6)).toBe(false);
     expect(hasNearbyRun([1, 20, 22, 24], 3, 6)).toBe(true);
     expect(hasNearbyRun([1, 2], 3, 6)).toBe(false);
+  });
+});
+
+describe('folio headers (page number inside the header)', () => {
+  /** Odd pages: "Section 3.N Title  83" (title changes); even: "84  Chapter 3 ..." */
+  function folioPage(n: number, offset = 0): PageLines {
+    const header = n % 2 ? `Section 3.${n} Topic number ${n}  ${n + offset}` : `${n + offset}  Chapter 3 Solving Problems`;
+    return pageLines(n, [
+      { text: header, y: 40, size: 10 },
+      { text: `Body text on page ${n} that is long enough to be a real line.`, y: 200 },
+    ]);
+  }
+
+  it('edgeNumbers reads numbers at the start or end of a line', () => {
+    expect(edgeNumbers('Section 3.1 Problem-Solving Agents 83')).toEqual([83]);
+    expect(edgeNumbers('84 Chapter 3 Solving Problems')).toEqual([84]);
+    expect(edgeNumbers('10')).toEqual([10]);
+    expect(edgeNumbers('No numbers here')).toEqual([]);
+  });
+
+  it('finds the offset between printed and PDF page numbers', () => {
+    expect(findFolioOffsets([1, 2, 3, 4, 5, 6].map((n) => folioPage(n, -2)))).toEqual(new Set([-2]));
+  });
+
+  it('removes headers whose text changes every page but carry the page number', () => {
+    const pages = [1, 2, 3, 4, 5, 6].map((n) => folioPage(n));
+    const running = findRunningLines(pages);
+    const { pages: out, removed } = removeHeadersAndFooters(pages, running, findFolioOffsets(pages));
+    expect(removed).toBe(6);
+    expect(out.every((p) => p.lines.length === 1)).toBe(true);
+  });
+
+  it('finds a LaTeX-style folio just below the 8% header zone', () => {
+    // CS229: "10" on PDF page 11 at y=101 of 792 (12.8% down).
+    const pages = [11, 12, 13, 14].map((n) =>
+      pageLines(n, [
+        { text: String(n - 1), y: 101, size: 12 },
+        { text: 'Body text that is long enough to be a real line of the notes.', y: 140 },
+      ]),
+    );
+    const { removed } = removeHeadersAndFooters(pages, findRunningLines(pages), findFolioOffsets(pages));
+    expect(removed).toBe(4);
+  });
+
+  it('ignores numbers that do not track the page number', () => {
+    const pages = [1, 2, 3, 4].map((n) => pageLines(n, [{ text: 'Table 7', y: 40, size: 10 }, { text: 'Body', y: 200 }]));
+    expect(findFolioOffsets(pages).size).toBe(0);
   });
 });

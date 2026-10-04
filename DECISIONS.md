@@ -128,3 +128,37 @@ Body paragraphs starting with `1. `, `2) `, `- `, `* `, `+ ` or `>` would render
 - `ConversionResult.sections` now lists the chapters that overlap the selection.
 
 *Alternative:* run full heading detection (with fonts) over the whole book. Rejected: fonts need `getOperatorList()` on every page, and extracting all 501 pages of Pro Git that way took ~12.5 s (D20). The background count only uses `getTextContent()`.
+
+### D28. Steps 3-5 were re-prioritised from real PDFs
+Before building columns, lists and tables, the pipeline was run on three real PDFs: Russell & Norvig *AIMA* 4th ed. (1,166 pages), Stanford CS229 notes (278 pages, pdfTeX) and a 22-page lecture deck (macOS Quartz). None is two-column and none has real tables, but they showed bigger problems: margin notes glued into sentences, odd-page headers surviving, diagram labels turned into headings, broken lists. Those were fixed first (D29-D33). Column and table handling is postponed until there is a real two-column PDF to test against; the "may be in the wrong order" warning stays.
+
+### D29. Margin notes are removed before lines are built
+AIMA prints glossary terms in the outer margin at 8pt, on the same baseline as body lines, so they were joined into sentences ("Goals organize Goal formulation behavior"). `layout/margins.ts` measures each page's text column from body-size items (5th/95th percentile of left/right edges) and drops text that is (a) smaller than 0.95× body size, (b) at least 0.5 em outside the column, and (c) part of a consistent margin: on ≥3 pages and ≥15% of the sample. Odd and even pages are measured separately because books mirror their layout. The header/footer zones are left alone, since running headers often put the page number outside the column and D30 needs it.
+Margin notes are **dropped**, not kept: in AIMA they repeat a term defined in the adjacent sentence, and keeping them cost tokens for no information. The stats line reports how many were removed. Same-size margin text is never dropped (too risky).
+
+### D30. Headers that carry the page number ("folios")
+Headers like "Section 3.1 Problem-Solving Agents 83" change every section, so repetition (D13, D23) can't find them. Instead, a page's first or last line (within the top/bottom 15%) is removed when it starts or ends with a number equal to the PDF page number plus an offset that holds on ≥30% of sampled pages (≥3). The offset handles front matter: CS229 prints "10" on PDF page 11. The zone is wider than 8% because LaTeX puts folios ~13% down the page.
+
+### D31. Figure labels above captions are dropped
+Diagram text is extracted like body text: the Romania map became `### Oradea`, `71`, `### Zerind 87`. A run of ≥2 short fragments (≤5 words without sentence-ending punctuation, or lines with wide gaps) directly above a caption ("Figure 3.1 …", "FIG. 2", "Exhibit A") is removed; the caption stays. Numbered section headings stop the run. In AIMA chapter 3 this removed 254 lines.
+
+### D32. Lists: markers, hanging indents, nesting
+- Markers: bullet glyphs (•, ◦, ▪, ➢ …), `-`/`–`/`*` + space, `3.`/`3)` + space, `3.Text` when a capital follows (slides), and `(a)`/`(iv)`/`a)` labels (kept in the text, since Markdown has no lettered lists).
+- A wrapped line continues an item when it lines up with the item's *text* (hanging indent), or wraps back to the marker mid-sentence and starts lowercase. Aligning with the text, not just "indented", matters: AIMA paragraphs indent to x=72 while bullet text sits at x=79.
+- Nesting follows marker x positions; rendering indents each level to its parent's text (CommonMark).
+- A marker beats bold/numbered heading rules, but not a clearly larger heading.
+
+### D33. TeX bold fonts and oversized glyphs
+- `BX` + design size is "bold extended" in TeX font names (CMBX12, CMSSBX10), so AIMA's "3.1.1 …" subheadings were missed as headings.
+- Same-line grouping used 0.5× the *largest* item size as tolerance. AIMA's 25pt pointing-hand icon beside 11pt text widened it enough to merge two lines. The size used is now capped at 1.5× the smaller item.
+
+### D34. Measured result: the saving is against PDF uploads, not raw text
+Whole chapters, estimated tokens (chars/4):
+
+| | Raw text of pages | Output | PDF upload (rough, D8) |
+|---|---|---|---|
+| AIMA ch. 3, 47 pp. | ~33,900 | ~32,800 | ~107,600 |
+| CS229 ch. 1, 12 pp. | ~4,650 | ~5,000 | ~23,500 |
+| Slides, 22 pp. | ~716 | ~843 | ~35,200 |
+
+Cleaning removes junk (AIMA: 46 header lines, 148 margin notes, 254 figure labels), but Markdown structure (headings, list markers, page markers, paragraph breaks) adds back about as much. So the output costs about the same as pasting the raw text, while being far more readable, and 70-98% less than uploading the PDF. The README's claims should say exactly this; Phase 6 will confirm with real token counts.

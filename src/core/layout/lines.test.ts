@@ -3,6 +3,17 @@ import { item, pageLines } from '../testing';
 import { groupLines, hasWideGap, joinItems, looksMultiColumn, roundSize } from './lines';
 
 describe('groupLines', () => {
+  it('does not let one oversized glyph swallow the next line', () => {
+    // A 25pt margin icon on the first line; the next line is 13pt below.
+    const lines = groupLines([item('I', 91, 521, 24.8), item('It is important', 118, 521), item('solution to any', 118, 534)]);
+    expect(lines.map((l) => l.text)).toEqual(['I It is important', 'solution to any']);
+  });
+
+  it('keeps superscripts on their line', () => {
+    const lines = groupLines([item('x', 72, 100), item('2', 78, 96.5, 7), item('next line', 72, 115)]);
+    expect(lines.map((l) => l.text)).toEqual(['x2', 'next line']);
+  });
+
   it('groups items by baseline and sorts lines top to bottom', () => {
     const lines = groupLines([
       item('second', 72, 120),
