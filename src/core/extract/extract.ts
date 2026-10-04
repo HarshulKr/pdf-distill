@@ -5,6 +5,7 @@
 // pure (no DOM, no Chrome) and lets the same code run in the side panel and in
 // Node tests.
 
+import type { HeadingCandidate } from '../outline/outline';
 import type { PageContent, TextItem } from '../types';
 
 export interface PdfTextItemLike {
@@ -211,33 +212,107 @@ export interface DocumentTextCount {
   chars: number;
   /** Pages with (almost) no text layer: OCR candidates. */
   lowTextPages: number[];
+  /** Most common font size in the document, weighted by characters. */
+  bodySize: number;
+  /** Large text runs, for finding chapters in PDFs without bookmarks. */
+  headingCandidates: HeadingCandidate[];
+}
+
+/** A run must be this much larger than its page's most common size to be kept. */
+const CANDIDATE_PAGE_RATIO = 1.15;
+/** Pages with less text than this (e.g. chapter title pages) keep their largest runs regardless. */
+const SPARSE_PAGE_CHARS = 300;
+/** At most this many candidates per page, largest first, to bound memory on big books. */
+const CANDIDATES_PER_PAGE = 5;
+
+function itemSize(item: PdfTextItemLike): number {
+  return Math.round(Math.hypot(item.transform[2] ?? 0, item.transform[3] ?? 0) * 2) / 2;
+}
+
+/**
+ * Group a page's items into runs of the same size on the same baseline, in
+ * content-stream order. Good enough for titles, which are usually written in
+ * one go; body text is never kept.
+ */
+export function textRuns(items: PdfTextItemLike[]): { text: string; size: number }[] {
+  const runs: { text: string; size: number; y: number }[] = [];
+  for (const item of items) {
+    if (item.str.trim() === '') continue;
+    const size = itemSize(item);
+    const y = item.transform[5] ?? 0;
+    const last = runs[runs.length - 1];
+    if (last?.size === size && Math.abs(last.y - y) < 0.5 * size) {
+      last.text += last.text.endsWith(' ') || item.str.startsWith(' ') ? item.str : ` ${item.str}`;
+    } else {
+      runs.push({ text: item.str, size, y });
+    }
+  }
+  return runs.map((r) => ({ text: r.text.replace(/\s+/g, ' ').trim(), size: r.size }));
+}
+
+/** The largest-text runs of one page that might be chapter titles. */
+export function pageHeadingCandidates(items: PdfTextItemLike[], page: number): HeadingCandidate[] {
+  const runs = textRuns(items);
+  const weights = new Map<number, number>();
+  let total = 0;
+  for (const r of runs) {
+    weights.set(r.size, (weights.get(r.size) ?? 0) + r.text.length);
+    total += r.text.length;
+  }
+  let pageMode = 0;
+  let best = -1;
+  for (const [size, w] of weights) {
+    if (w > best) {
+      pageMode = size;
+      best = w;
+    }
+  }
+  const sparse = total < SPARSE_PAGE_CHARS;
+  return runs
+    .filter((r) => r.size > 0 && (sparse || r.size >= CANDIDATE_PAGE_RATIO * pageMode))
+    .sort((a, b) => b.size - a.size)
+    .slice(0, CANDIDATES_PER_PAGE)
+    .map((r) => ({ page, text: r.text, size: r.size }));
 }
 
 /**
  * Count the raw extracted text of the whole document, for the "before" token
- * estimate. Uses getTextContent only (no fonts), so it is much cheaper than
- * converting.
+ * estimate, and collect chapter-title candidates on the way. Uses
+ * getTextContent only (no fonts), so it is much cheaper than converting.
  */
 export async function countDocumentText(doc: PdfDocumentLike, options: RunOptions = {}): Promise<DocumentTextCount> {
   let chars = 0;
   const lowTextPages: number[] = [];
+  const sizeChars = new Map<number, number>();
+  const headingCandidates: HeadingCandidate[] = [];
   for (let p = 1; p <= doc.numPages; p++) {
     throwIfAborted(options.signal);
     const page = await doc.getPage(p);
     try {
       const content = await page.getTextContent();
+      const items = content.items.filter(isTextItem);
       let pageChars = 0;
-      for (const item of content.items) {
-        if (!isTextItem(item)) continue;
+      for (const item of items) {
         pageChars += item.str.length + (item.hasEOL ? 1 : 0);
+        const size = itemSize(item);
+        sizeChars.set(size, (sizeChars.get(size) ?? 0) + item.str.length);
       }
       chars += pageChars;
       if (pageChars < LOW_TEXT_CHARS) lowTextPages.push(p);
+      else headingCandidates.push(...pageHeadingCandidates(items, p));
     } finally {
       page.cleanup();
     }
     options.onProgress?.({ done: p, total: doc.numPages, page: p });
     await yieldToEventLoop();
   }
-  return { pages: doc.numPages, chars, lowTextPages };
+  let bodySize = 0;
+  let best = -1;
+  for (const [size, w] of sizeChars) {
+    if (w > best) {
+      bodySize = size;
+      best = w;
+    }
+  }
+  return { pages: doc.numPages, chars, lowTextPages, bodySize, headingCandidates };
 }

@@ -2,7 +2,7 @@
 
 A Chrome extension that converts PDFs into clean, compact Markdown **locally in your browser**. Keep only the part you need (a chapter, a page range, or the sections relevant to your question), see a before/after token estimate, and paste the result into Claude, ChatGPT or another AI chat.
 
-> **Status: Phase 1 (MVP).** Converts a PDF or a page range to clean Markdown with headers, footers and page numbers removed. Chapter selection, lists, tables and columns come in Phase 2. See [Roadmap](#roadmap).
+> **Status: Phase 2 in progress.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed. Lists, tables and columns are still to come in Phase 2. See [Roadmap](#roadmap).
 
 ## Why
 
@@ -34,7 +34,7 @@ For live reload while developing: `npm run dev` (WXT opens a Chrome instance wit
 
 1. Click the PDF Distill toolbar icon to open the side panel.
 2. Drop a PDF on the panel (or click to choose one). The panel shows its title and page count, and measures the whole document's text in the background.
-3. Optionally type pages, e.g. `45-70, 82`, `100-` (to the end), or leave it empty for all pages.
+3. Optionally tick chapters in the **Chapters** list (shown when the PDF has bookmarks or clear chapter headings), or type pages, e.g. `45-70, 82`, `100-` (to the end), or leave it empty for all pages.
 4. Click **Convert**. A progress bar shows "Reading page X of Y"; **Cancel** stops it.
 5. Check the Markdown preview (you can edit it), then **Copy** or **Download .md** and paste it into your AI chat.
 
@@ -80,7 +80,7 @@ Each step is pure TypeScript in `src/core/`, unit tested in Node. Steps marked *
    - Headings are lines ≥1.2× that size, or short bold lines, or "Chapter 3" / "3.2 Title" patterns; sizes map to levels 1–3.
    - Paragraphs are split on larger vertical gaps or indented first lines, and joined across page breaks.
    - Lists and tables are *(later)*.
-5. **Outline**: chapters from bookmarks or headings *(later)*.
+5. **Chapters** (`outline/`): from the PDF's bookmarks, or, without bookmarks, from large headings found during the whole-document count. Ticking chapters fills in the page range.
 6. **Markdown** (`markdown/`): a source line, optional `<!-- page N -->` markers, headings and paragraphs, with blank lines collapsed.
 7. **Tokens** (`tokens/`): before/after estimates.
 8. **Trim** to a question (local embeddings) and **OCR** for scanned pages *(later)*.

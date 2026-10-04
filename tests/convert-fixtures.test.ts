@@ -10,7 +10,9 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { convertFixture } from '../scripts/lib/node-pdf';
+import { convertFixture, openFixture } from '../scripts/lib/node-pdf';
+import { countDocumentText } from '../src/core/extract/extract';
+import { sectionsFromHeadings, sectionsFromOutline } from '../src/core/outline/outline';
 
 const GOLDEN = join(import.meta.dirname, 'golden');
 const UPDATE = process.env.UPDATE_GOLDEN === '1';
@@ -106,5 +108,39 @@ describe('warnings', () => {
   it.each(['two-column.pdf', 'table.pdf'])('flags possible columns/tables in %s instead of failing silently', async (pdf) => {
     const { warnings } = await convertFixture(pdf);
     expect(warnings).toEqual([expect.stringMatching(/^Page 1 seems to have columns or a table/)]);
+  });
+});
+
+describe('chapters', () => {
+  it('reads bookmarks from outline.pdf as chapters with page ranges', async () => {
+    const { doc, close } = await openFixture('outline.pdf');
+    try {
+      expect(await sectionsFromOutline(doc)).toEqual([
+        { title: 'Chapter 1 Cells', level: 1, startPage: 1, endPage: 3 },
+        { title: '1.2 Cell Size', level: 2, startPage: 2, endPage: 3 },
+        { title: 'Chapter 2 Membranes', level: 1, startPage: 4, endPage: 6 },
+        { title: '2.2 Transport', level: 2, startPage: 5, endPage: 6 },
+        { title: 'Chapter 3 Energy', level: 1, startPage: 7, endPage: 9 },
+        { title: '3.2 Respiration', level: 2, startPage: 8, endPage: 9 },
+      ]);
+    } finally {
+      await close();
+    }
+  });
+
+  it('falls back to large headings when a PDF has no bookmarks', async () => {
+    const { doc, close } = await openFixture('headings.pdf');
+    try {
+      expect(await sectionsFromOutline(doc)).toEqual([]);
+      const count = await countDocumentText(doc);
+      const sections = sectionsFromHeadings(count.headingCandidates, count.bodySize, count.pages);
+      expect(sections).toEqual([
+        { title: 'Chapter 1 Energy and Matter', level: 1, startPage: 1, endPage: 2 },
+        { title: '1.1 Systems and Surroundings', level: 2, startPage: 1, endPage: 1 },
+        { title: '1.2 Systems and Surroundings Revisited', level: 2, startPage: 2, endPage: 2 },
+      ]);
+    } finally {
+      await close();
+    }
   });
 });

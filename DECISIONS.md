@@ -120,3 +120,11 @@ Phase 1's headline was whole-document text → output. For a 5-page selection of
 
 ### D26. More paragraph-start escaping
 Body paragraphs starting with `1. `, `2) `, `- `, `* `, `+ ` or `>` would render as lists or quotes. They are now escaped (`1\. `, `\- `, `\>`), in addition to the existing `# ` escape.
+
+### D27. Chapters: bookmarks first, large headings as a fallback
+- **Bookmarks** (`outline/`): read with `getOutline()`, levels 1-2 only (deeper levels made the list too long to scan). Destinations are resolved from names, page references, or a raw 0-based page index (some PDF writers use that). A section ends just before the next entry at the same or a higher level.
+- **Fallback**: for PDFs without bookmarks, the background whole-document count now also collects large text runs (≥1.15× the page's usual size, at most 5 per page, so memory stays bounded on big books). Runs ≥1.4× the document's body size that look like titles become chapters, with the two largest sizes as levels 1 and 2. 1.4× is stricter than the 1.2× used for headings inside the output, because a chapter list full of minor headings is useless. The list is labelled "from large headings; check the page ranges".
+- **UI**: ticking chapters fills in the page range (the union of their pages). Typing a range clears the ticks, so the two never disagree.
+- `ConversionResult.sections` now lists the chapters that overlap the selection.
+
+*Alternative:* run full heading detection (with fonts) over the whole book. Rejected: fonts need `getOperatorList()` on every page, and extracting all 501 pages of Pro Git that way took ~12.5 s (D20). The background count only uses `getTextContent()`.

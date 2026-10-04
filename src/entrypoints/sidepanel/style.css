@@ -327,3 +327,54 @@ footer {
   text-align: center;
   padding-bottom: 8px;
 }
+
+/* Chapter picker: ticking chapters fills in the page range. */
+.chapters {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chapters legend {
+  font-weight: 600;
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.chapter-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.chapter-list li {
+  padding: 2px 0;
+}
+
+.chapter-list li.level-2 {
+  padding-left: 20px;
+}
+
+.chapter-list .check {
+  align-items: baseline;
+}
+
+.chapter-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chapter-pages {
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.85rem;
+}

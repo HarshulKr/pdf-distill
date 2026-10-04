@@ -149,7 +149,22 @@ describe('countDocumentText', () => {
     const long: PdfTextContentItem = { str: 'a'.repeat(30), transform: [], width: 0, height: 0, fontName: 'f', hasEOL: true };
     const doc = fakeDoc([fakePage([long]), fakePage([]), fakePage([long, long])]);
     const count = await countDocumentText(doc);
-    expect(count).toEqual({ pages: 3, chars: 31 * 3, lowTextPages: [2] });
+    expect(count).toMatchObject({ pages: 3, chars: 31 * 3, lowTextPages: [2] });
+  });
+
+  it('finds the body size and large-text chapter candidates', async () => {
+    const t = (str: string, size: number, y: number): PdfTextContentItem => ({
+      str,
+      transform: [size, 0, 0, size, 72, y],
+      width: 0,
+      height: size,
+      fontName: 'f',
+    });
+    const body = Array.from({ length: 10 }, (_, i) => t('Body text that is long enough to dominate the page.', 11, 600 - i * 15));
+    const doc = fakeDoc([fakePage([t('Chapter 2', 24, 700), t('Membranes', 24, 700), ...body]), fakePage(body)]);
+    const count = await countDocumentText(doc);
+    expect(count.bodySize).toBe(11);
+    expect(count.headingCandidates).toEqual([{ page: 1, text: 'Chapter 2 Membranes', size: 24 }]);
   });
 
   it('can be cancelled', async () => {

@@ -7,10 +7,11 @@ import { LOW_TEXT_CHARS } from './extract/extract';
 import { findRunningLines, removeHeadersAndFooters } from './clean/headers';
 import { looksMultiColumn, pageToLines } from './layout/lines';
 import { renderMarkdown } from './markdown/render';
+import { sectionsInSelection } from './outline/outline';
 import { formatPageList } from './pages/range';
 import { buildBlocks, buildProfile } from './structure/structure';
 import { estimateRawPdfUploadTokens, estimateTokens, estimateTokensFromChars } from './tokens/estimate';
-import type { ConversionResult, PageContent, PageLines } from './types';
+import type { ConversionResult, PageContent, PageLines, Section } from './types';
 
 export interface ConvertOptions {
   pageMarkers: boolean;
@@ -34,6 +35,8 @@ export interface ConvertInput {
   fileName?: string;
   /** Whole-document text count, if the background count has finished. */
   wholeDocument?: WholeDocumentCount | null;
+  /** The document's chapters, if known; the ones overlapping the selection are returned. */
+  sections?: Section[];
 }
 
 /** "page 12" or "pages 4-9, 12". */
@@ -120,7 +123,7 @@ export function convert(input: ConvertInput): ConversionResult {
 
   return {
     markdown,
-    sections: [],
+    sections: sectionsInSelection(input.sections ?? [], input.selected),
     stats: {
       pages: input.selected.length,
       charsSelected,

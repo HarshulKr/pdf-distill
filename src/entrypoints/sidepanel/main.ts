@@ -5,9 +5,10 @@
 import { beforeStats, convert, pagesLabel, type WholeDocumentCount } from '@/core/convert';
 import { CancelledError, countDocumentText, extractPages } from '@/core/extract/extract';
 import { markdownFileName } from '@/core/markdown/render';
+import { pagesOfSections, sectionsFromHeadings, sectionsFromOutline } from '@/core/outline/outline';
 import { formatPageList, parsePageRange, samplePages } from '@/core/pages/range';
 import { estimateTokens, formatTokenEstimate, RAW_PDF_IMAGE_TOKENS_PER_PAGE } from '@/core/tokens/estimate';
-import type { ConversionResult } from '@/core/types';
+import type { ConversionResult, Section } from '@/core/types';
 import { loadPdf, PdfLoadError, type LoadedPdf } from '@/lib/pdf';
 import { loadSettings, saveSettings, type Settings } from '@/lib/settings';
 
@@ -31,6 +32,9 @@ const ui = {
   changeFile: el('change-file', HTMLButtonElement),
   largeWarning: el('large-warning', HTMLElement),
   countStatus: el('count-status', HTMLElement),
+  chapters: el('chapters', HTMLFieldSetElement),
+  chapterList: el('chapter-list', HTMLUListElement),
+  chaptersSource: el('chapters-source', HTMLElement),
   range: el('range', HTMLInputElement),
   rangeError: el('range-error', HTMLElement),
   pageMarkers: el('page-markers', HTMLInputElement),
@@ -60,6 +64,8 @@ interface State {
   result: ConversionResult | null;
   /** Page list of the last conversion, e.g. "45-70, 82" (null = whole document). */
   convertedPages: string | null;
+  /** Chapters from bookmarks, or from large headings once the count finishes. */
+  sections: Section[];
 }
 
 const state: State = {
@@ -71,6 +77,7 @@ const state: State = {
   convertAbort: null,
   result: null,
   convertedPages: null,
+  sections: [],
 };
 
 // ---------------------------------------------------------------- helpers
@@ -89,6 +96,7 @@ function setBusy(busy: boolean): void {
   ui.cancel.hidden = !busy;
   ui.range.disabled = busy;
   ui.pageMarkers.disabled = busy;
+  ui.chapters.disabled = busy;
   ui.changeFile.disabled = busy;
   ui.progressWrap.hidden = !busy;
 }
@@ -106,6 +114,8 @@ async function closeCurrent(): Promise<void> {
   state.pdf = null;
   state.whole = null;
   state.result = null;
+  state.sections = [];
+  renderChapters('');
   if (pdf) await pdf.close();
 }
 
@@ -139,7 +149,57 @@ async function openFile(file: File): Promise<void> {
   ui.rangeError.hidden = true;
   ui.doc.hidden = false;
   ui.dropZone.hidden = true;
+  void loadChapters();
   void countWholeDocument();
+}
+
+// ---------------------------------------------------------------- chapters
+
+/** Bookmarks are cheap to read, so they are shown right after opening. */
+async function loadChapters(): Promise<void> {
+  const pdf = state.pdf;
+  if (!pdf) return;
+  const sections = await sectionsFromOutline(pdf.doc);
+  if (state.pdf !== pdf || sections.length === 0) return;
+  state.sections = sections;
+  renderChapters('from bookmarks');
+}
+
+/** Long outlines are cut off here; the page range still works for the rest. */
+const MAX_LISTED_CHAPTERS = 300;
+
+function renderChapters(source: string): void {
+  const items = state.sections.slice(0, MAX_LISTED_CHAPTERS).map((section, i) => {
+    const li = document.createElement('li');
+    li.className = `level-${section.level}`;
+    const label = document.createElement('label');
+    label.className = 'check';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.value = String(i);
+    const title = document.createElement('span');
+    title.className = 'chapter-title';
+    title.textContent = section.title;
+    const pages = document.createElement('span');
+    pages.className = 'chapter-pages';
+    pages.textContent =
+      section.startPage === section.endPage ? `p. ${section.startPage}` : `pp. ${section.startPage}–${section.endPage}`;
+    label.append(box, title, pages);
+    li.append(label);
+    return li;
+  });
+  ui.chapterList.replaceChildren(...items);
+  ui.chaptersSource.textContent = source ? `(${source})` : '';
+  ui.chapters.hidden = items.length === 0;
+}
+
+/** Ticking chapters fills in the page range with the union of their pages. */
+function applyChapterSelection(): void {
+  const ticked = [...ui.chapterList.querySelectorAll<HTMLInputElement>('input:checked')]
+    .map((box) => state.sections[Number(box.value)])
+    .filter((s): s is Section => s !== undefined);
+  ui.range.value = ticked.length ? formatPageList(pagesOfSections(ticked)) : '';
+  ui.rangeError.hidden = true;
 }
 
 /** Background count of the whole document's text, for the "before" numbers. */
@@ -167,6 +227,11 @@ async function countWholeDocument(): Promise<void> {
       const label = pagesLabel(count.lowTextPages);
       const verb = count.lowTextPages.length === 1 ? 'has' : 'have';
       ui.countStatus.textContent += ` ${label.charAt(0).toUpperCase()}${label.slice(1)} ${verb} no text layer.`;
+    }
+    // No bookmarks: fall back to large headings found while counting.
+    if (state.sections.length === 0) {
+      state.sections = sectionsFromHeadings(count.headingCandidates, count.bodySize, count.pages);
+      renderChapters('from large headings; check the page ranges');
     }
     renderStats();
   } catch (error) {
@@ -218,6 +283,7 @@ async function runConvert(): Promise<void> {
       options: { pageMarkers: ui.pageMarkers.checked },
       fileName: state.fileName,
       wholeDocument: state.whole,
+      sections: state.sections,
     });
     state.convertedPages = selected.length === total ? null : formatPageList(selected);
     ui.preview.value = state.result.markdown;
@@ -354,7 +420,10 @@ ui.range.addEventListener('keydown', (event) => {
 });
 ui.range.addEventListener('input', () => {
   ui.rangeError.hidden = true;
+  // A typed range replaces the chapter selection.
+  for (const box of ui.chapterList.querySelectorAll('input')) box.checked = false;
 });
+ui.chapterList.addEventListener('change', applyChapterSelection);
 ui.pageMarkers.addEventListener('change', () => {
   state.settings.pageMarkers = ui.pageMarkers.checked;
   void saveSettings(state.settings);
