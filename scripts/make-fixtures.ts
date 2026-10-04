@@ -13,6 +13,7 @@
  *   two-column.pdf       full-width title, then two text columns
  *   table.pdf            a simple 3-column table between paragraphs
  *   no-text-layer.pdf    page 1 has text; page 2 has text drawn as shapes only
+ *   scanned.pdf          page 1 of running-headers.pdf as an image only (a "scan")
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -403,6 +404,31 @@ async function noTextLayer(): Promise<void> {
   await save(doc, 'no-text-layer.pdf');
 }
 
+/**
+ * A realistic scan: page 1 of running-headers.pdf rendered to a 200 DPI
+ * greyscale-looking PNG with pdf.js, then embedded as the only content of a
+ * new page. Unlike no-text-layer.pdf's blocky shapes, OCR can read this
+ * reliably (DECISIONS.md D6, D45).
+ */
+async function scanned(): Promise<void> {
+  const { openPdf } = await import('./lib/node-pdf');
+  const source = await openPdf(join(OUT_DIR, 'running-headers.pdf'));
+  try {
+    const page = await source.doc.getPage(1);
+    const viewport = page.getViewport({ scale: 200 / 72 });
+    const factory = (source.doc as unknown as { canvasFactory: { create(w: number, h: number): { canvas: { toBuffer(t: 'image/png'): Buffer } } } }).canvasFactory;
+    const { canvas } = factory.create(Math.ceil(viewport.width), Math.ceil(viewport.height));
+    await page.render({ canvas, viewport, intent: 'print' } as unknown as Parameters<typeof page.render>[0]).promise;
+    const { doc } = await newDoc('Scanned fixture');
+    const image = await doc.embedPng(canvas.toBuffer('image/png'));
+    const p = doc.addPage([PAGE_W, PAGE_H]);
+    p.drawImage(image, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+    await save(doc, 'scanned.pdf');
+  } finally {
+    await source.close();
+  }
+}
+
 async function main(): Promise<void> {
   await mkdir(OUT_DIR, { recursive: true });
   await mkdir(join(OUT_DIR, 'local'), { recursive: true });
@@ -413,6 +439,7 @@ async function main(): Promise<void> {
   await twoColumn();
   await table();
   await noTextLayer();
+  await scanned();
 }
 
 main().catch((error: unknown) => {

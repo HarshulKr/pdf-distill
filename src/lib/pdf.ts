@@ -39,6 +39,10 @@ export async function loadPdf(data: ArrayBuffer): Promise<LoadedPdf> {
     cMapPacked: true,
     // Text extraction never needs fonts installed in the page.
     disableFontFace: true,
+    // Rendering pages for OCR: bundled image decoders (JPEG 2000, JBIG2,
+    // colour profiles) and standard font data.
+    wasmUrl: new URL('/pdfjs/wasm/', location.origin).href,
+    standardFontDataUrl: new URL('/pdfjs/standard_fonts/', location.origin).href,
     verbosity: 0,
   });
   // Without a handler pdf.js waits forever for a password; fail instead.

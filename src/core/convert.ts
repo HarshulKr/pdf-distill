@@ -147,13 +147,21 @@ export function convert(input: ConvertInput): ConversionResult {
   // ("Downloaded from ...") on every page. That is enough raw text to look
   // like a text layer, but it is removed as a running header, which would
   // otherwise leave empty pages with no warning.
+  const ocrDone = new Set(input.pages.filter((p) => p.ocr).map((p) => p.page));
   const lowText = figures.pages
+    .filter((p) => !ocrDone.has(p.page))
     .filter((p) => p.lines.reduce((n, l) => n + l.text.length, 0) < LOW_TEXT_CHARS)
     .map((p) => p.page);
   if (lowText.length) {
     const one = lowText.length === 1;
     warnings.push(
-      `${capitalisedPagesLabel(lowText)} ${one ? 'has' : 'have'} no readable text, apart from any headers or watermarks (probably scanned images), so ${one ? 'it is' : 'they are'} missing from the output. OCR support is planned.`,
+      `${capitalisedPagesLabel(lowText)} ${one ? 'has' : 'have'} no readable text, apart from any headers or watermarks (probably scanned images), so ${one ? 'it is' : 'they are'} missing from the output. Run OCR to read ${one ? 'it' : 'them'}.`,
+    );
+  }
+  const ocrPages = input.pages.filter((p) => p.ocr && selectedSet.has(p.page)).map((p) => p.page);
+  if (ocrPages.length) {
+    warnings.push(
+      `${capitalisedPagesLabel(ocrPages)} ${ocrPages.length === 1 ? 'was' : 'were'} read with OCR, which can misread symbols, numbers and diagram labels. Check anything important against the PDF.`,
     );
   }
   // Checked after tables are taken out, so a page with a recognised table is not flagged.
@@ -184,5 +192,6 @@ export function convert(input: ConvertInput): ConversionResult {
       removedFigureLines: figures.removed,
     },
     warnings,
+    scannedPages: lowText,
   };
 }

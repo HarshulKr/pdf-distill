@@ -378,3 +378,15 @@ footer {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* Offer to OCR scanned pages, shown under the warnings. */
+.ocr-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.ocr-offer p {
+  margin: 0;
+}

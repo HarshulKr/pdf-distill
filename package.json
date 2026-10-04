@@ -18,8 +18,10 @@
     "convert": "tsx scripts/convert.ts"
   },
   "dependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
     "js-tiktoken": "1.0.21",
-    "pdfjs-dist": "6.4.299"
+    "pdfjs-dist": "6.4.299",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

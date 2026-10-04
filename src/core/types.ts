@@ -26,6 +26,8 @@ export interface PageContent {
   width: number;
   height: number;
   items: TextItem[];
+  /** True when `items` came from OCR of the rendered page, not its text layer. */
+  ocr?: boolean;
 }
 
 /** Items on the same page and baseline, joined left to right. */
@@ -120,4 +122,6 @@ export interface ConversionResult {
   stats: ConversionStats;
   /** Human-readable, e.g. "Pages 4-9 have no readable text ...". */
   warnings: string[];
+  /** Selected pages with no readable text that have not been OCR'd yet: candidates for OCR. */
+  scannedPages: number[];
 }

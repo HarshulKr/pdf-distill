@@ -76,7 +76,7 @@ describe('convert', () => {
     const result = convert({ pages: [...pages, empty, columns], selected: [7, 8, 9], options: { pageMarkers: false } });
     expect(result.warnings).toEqual([
       'Page 9 could not be read.',
-      'Page 7 has no readable text, apart from any headers or watermarks (probably scanned images), so it is missing from the output. OCR support is planned.',
+      'Page 7 has no readable text, apart from any headers or watermarks (probably scanned images), so it is missing from the output. Run OCR to read it.',
       'Page 8 seems to have columns or a table. Their text may be in the wrong order; check those parts before relying on them.',
     ]);
   });
@@ -95,7 +95,7 @@ describe('scanned pages with a watermark', () => {
     const result = convert({ pages: scanned, selected: [1, 2, 3], options: { pageMarkers: false } });
     expect(result.markdown.trim()).toBe('');
     expect(result.warnings).toEqual([
-      'Pages 1-3 have no readable text, apart from any headers or watermarks (probably scanned images), so they are missing from the output. OCR support is planned.',
+      'Pages 1-3 have no readable text, apart from any headers or watermarks (probably scanned images), so they are missing from the output. Run OCR to read them.',
     ]);
   });
 });
@@ -111,5 +111,31 @@ describe('removedSummary', () => {
   it('lists non-zero parts with plurals', () => {
     expect(removedSummary({ removedLines: 12, removedMarginNotes: 1, removedFigureLines: 0 })).toBe('12 header/footer lines, 1 margin note');
     expect(removedSummary({ removedLines: 0, removedMarginNotes: 0, removedFigureLines: 0 })).toBe('nothing');
+  });
+});
+
+describe('OCR', () => {
+  const watermark = 'Downloaded from https://www.example.com/selina-physics';
+  const scanned = Array.from({ length: 4 }, (_, i) =>
+    page(i + 1, [
+      { text: watermark, y: 18, size: 16 },
+      { text: watermark, y: 739, size: 16 },
+    ]),
+  );
+
+  it('reports scanned pages as OCR candidates', () => {
+    expect(convert({ pages: scanned, selected: [2, 3], options: { pageMarkers: false } }).scannedPages).toEqual([2, 3]);
+  });
+
+  it('converts OCR text like any other text and says it was OCR\'d', () => {
+    const ocrd = scanned.map((p) =>
+      p.page === 2 ? { ...page(2, bodyLines(['The moment of force is a vector quantity.'], 120)), ocr: true } : p,
+    );
+    const result = convert({ pages: ocrd, selected: [2], options: { pageMarkers: false } });
+    expect(result.markdown.trim()).toBe('The moment of force is a vector quantity.');
+    expect(result.scannedPages).toEqual([]);
+    expect(result.warnings).toEqual([
+      'Page 2 was read with OCR, which can misread symbols, numbers and diagram labels. Check anything important against the PDF.',
+    ]);
   });
 });

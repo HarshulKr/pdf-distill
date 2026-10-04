@@ -8,7 +8,8 @@ import { markdownFileName } from '@/core/markdown/render';
 import { pagesOfSections, sectionsFromHeadings, sectionsFromOutline } from '@/core/outline/outline';
 import { formatPageList, parsePageRange, samplePages } from '@/core/pages/range';
 import { countTokens, formatTokenEstimate, RAW_PDF_IMAGE_TOKENS_PER_PAGE, TOKENIZER_NAME } from '@/core/tokens/estimate';
-import type { ConversionResult, Section } from '@/core/types';
+import type { ConversionResult, PageContent, Section } from '@/core/types';
+import { createOcrEngine, type OcrEngine } from '@/lib/ocr';
 import { loadPdf, PdfLoadError, type LoadedPdf } from '@/lib/pdf';
 import { loadSettings, saveSettings, type Settings } from '@/lib/settings';
 
@@ -52,6 +53,8 @@ const ui = {
   copy: el('copy', HTMLButtonElement),
   download: el('download', HTMLButtonElement),
   copyStatus: el('copy-status', HTMLElement),
+  ocrOffer: el('ocr-offer', HTMLElement),
+  runOcr: el('run-ocr', HTMLButtonElement),
 };
 
 interface State {
@@ -66,6 +69,10 @@ interface State {
   convertedPages: string | null;
   /** Chapters from bookmarks, or from large headings once the count finishes. */
   sections: Section[];
+  /** Pages extracted for the last conversion and the selection, kept so OCR can re-convert. */
+  last: { pages: PageContent[]; selected: number[] } | null;
+  /** OCR results for this document, by page, reused across conversions. */
+  ocrPages: Map<number, PageContent>;
 }
 
 const state: State = {
@@ -78,7 +85,12 @@ const state: State = {
   result: null,
   convertedPages: null,
   sections: [],
+  last: null,
+  ocrPages: new Map(),
 };
+
+/** Rough OCR time per page, for the button label (measured ~6-8 s at 300 DPI). */
+const OCR_SECONDS_PER_PAGE = 7;
 
 // ---------------------------------------------------------------- helpers
 
@@ -96,6 +108,7 @@ function setBusy(busy: boolean): void {
   ui.cancel.hidden = !busy;
   ui.range.disabled = busy;
   ui.pageMarkers.disabled = busy;
+  ui.runOcr.disabled = busy;
   ui.chapters.disabled = busy;
   ui.changeFile.disabled = busy;
   ui.progressWrap.hidden = !busy;
@@ -115,6 +128,8 @@ async function closeCurrent(): Promise<void> {
   state.whole = null;
   state.result = null;
   state.sections = [];
+  state.last = null;
+  state.ocrPages = new Map();
   renderChapters('');
   if (pdf) await pdf.close();
 }
@@ -275,27 +290,77 @@ async function runConvert(): Promise<void> {
         setProgress(done, n, `Reading page ${done} of ${n}…`);
       },
     });
-    setProgress(toExtract.length, toExtract.length, 'Building Markdown…');
-    await new Promise((resolve) => setTimeout(resolve, 0)); // let the label paint
-    state.result = convert({
-      pages,
-      selected,
-      options: { pageMarkers: ui.pageMarkers.checked },
-      fileName: state.fileName,
-      wholeDocument: state.whole,
-      sections: state.sections,
-    });
+    state.last = { pages, selected };
     state.convertedPages = selected.length === total ? null : formatPageList(selected);
-    ui.preview.value = state.result.markdown;
-    renderWarnings(state.result.warnings);
-    renderStats();
-    ui.result.hidden = false;
-    ui.copyStatus.textContent = '';
+    await showConversion();
   } catch (error) {
     if (!(error instanceof CancelledError)) {
       showError(`Conversion failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   } finally {
+    if (state.convertAbort === abort) state.convertAbort = null;
+    setBusy(false);
+  }
+}
+
+/** Convert the last extracted pages (with any OCR results swapped in) and show the result. */
+async function showConversion(): Promise<void> {
+  const last = state.last;
+  if (!last) return;
+  setProgress(1, 1, 'Building Markdown…');
+  await new Promise((resolve) => setTimeout(resolve, 0)); // let the label paint
+  state.result = convert({
+    pages: last.pages.map((p) => state.ocrPages.get(p.page) ?? p),
+    selected: last.selected,
+    options: { pageMarkers: ui.pageMarkers.checked },
+    fileName: state.fileName,
+    wholeDocument: state.whole,
+    sections: state.sections,
+  });
+  ui.preview.value = state.result.markdown;
+  renderWarnings(state.result.warnings);
+  renderOcrOffer(state.result.scannedPages);
+  renderStats();
+  ui.result.hidden = false;
+  ui.copyStatus.textContent = '';
+}
+
+// ---------------------------------------------------------------- OCR
+
+function renderOcrOffer(scanned: number[]): void {
+  ui.ocrOffer.hidden = scanned.length === 0;
+  if (scanned.length === 0) return;
+  const seconds = scanned.length * OCR_SECONDS_PER_PAGE;
+  const time = seconds < 90 ? `~${Math.max(5, Math.round(seconds / 5) * 5)} s` : `~${Math.round(seconds / 60)} min`;
+  ui.runOcr.textContent = `Run OCR on ${pagesLabel(scanned)} (${time})`;
+}
+
+/** OCR the scanned pages of the last conversion, then convert again. */
+async function runOcr(): Promise<void> {
+  const pdf = state.pdf;
+  const pages = state.result?.scannedPages ?? [];
+  if (!pdf || pages.length === 0) return;
+  showError(null);
+  const abort = new AbortController();
+  state.convertAbort = abort;
+  setBusy(true);
+  setProgress(0, pages.length, 'Starting OCR…');
+  let engine: OcrEngine | null = null;
+  try {
+    engine = await createOcrEngine();
+    for (const [i, page] of pages.entries()) {
+      if (abort.signal.aborted) break;
+      setProgress(i, pages.length, `OCR: page ${i + 1} of ${pages.length} (PDF page ${page})…`);
+      const result = await engine.ocrPage(pdf.doc, page);
+      if (state.pdf !== pdf) return; // a different file was opened meanwhile
+      state.ocrPages.set(page, result);
+    }
+    // Also after Cancel: pages finished so far are kept and shown.
+    await showConversion();
+  } catch (error) {
+    showError(`OCR failed: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    await engine?.close();
     if (state.convertAbort === abort) state.convertAbort = null;
     setBusy(false);
   }
@@ -439,6 +504,7 @@ ui.preview.addEventListener('input', () => {
 });
 ui.copy.addEventListener('click', () => void copyMarkdown());
 ui.download.addEventListener('click', downloadMarkdown);
+ui.runOcr.addEventListener('click', () => void runOcr());
 
 void loadSettings().then((settings) => {
   state.settings = settings;

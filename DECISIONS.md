@@ -223,3 +223,40 @@ Re-measured (D34), tokens via cl100k:
 | IEEE two-column paper, 4 pp. | ~5,900 | ~5,500 | ~12,100 |
 
 With real counts the output is 6-14% *smaller* than the raw text for books and papers, level for lecture notes, and 15% larger for slides (list markers on short bullets). The main saving is still against PDF uploads: 55-98%.
+
+---
+
+## Phase 3
+
+### D44. Phase 3 (question-aware trimming) dropped
+Dropped at the user's request: it would add a ~20-50 MB embedding model and a second, fuzzier step between the user and their text, for a saving the chapter picker and page ranges already mostly deliver.
+
+---
+
+## Phase 4
+
+### D45. OCR engine and bundling (agreed choices: bundled, on a button, English only)
+- **Engine:** tesseract.js 7.0.0 (Apache-2.0) with the LSTM engine and the `eng` 4.0.0_best_int model (2.95 MB gzipped), all pinned. It runs in a Web Worker inside the extension; nothing is uploaded.
+- **Bundled, not downloaded:** the extension still makes zero network requests. Only the two SIMD engine builds ship (relaxed-SIMD and SIMD, ~3.9 MB each); Chrome 116+ always supports SIMD, so the slower non-SIMD fallback is left out. pdf.js's JPEG 2000, JBIG2 and colour-profile decoders and its standard fonts are bundled too: without them the Selina scan rendered as **blank white pages**. Built extension: 4.0 → 16.1 MB.
+- **On a button:** after converting, scanned pages produce a "Run OCR on pages 3-4 (~15 s)" button. OCR results are kept per document, so changing the page range does not redo them; Cancel keeps finished pages.
+- **Worker setup:** `workerBlobURL: false` (a blob: worker is blocked by the extension's CSP), and every path points at a bundled file. tesseract.js's defaults point at a CDN.
+
+### D46. OCR words become text items; the pipeline is unchanged
+Tesseract's lines often run straight across both columns ("…pivoted at (2) The upper circular stone…"), so only **word** boxes are used. Each word becomes a TextItem at its baseline, and the normal layout code rebuilds lines and columns, so headers, columns, lists, tables and hyphen repair all work on OCR'd pages. Tested on the scanned Selina chapter (18 pages, two columns) and a generated scan.
+- **Font size** is not reported by Tesseract. It is estimated from each word's box height divided by the box's expected height in ems for its letters (ascenders and descenders: 0.92; ascenders only: 0.7; descenders only: 0.69; x-height only: 0.47), then the median over each run of nearby words is used, so a whole line gets one size.
+- **Confidence cut-off 60:** on a scanned textbook page, 487 of 561 words scored 90+, and every word between 40 and 60 was a misread diagram label or speck ("Leis", "Joti.", "©"). A real "(2)" scored 69.
+- **300 DPI**, capped at 4,000 px on the long side; ~6-8 s per page (Node and Chrome).
+
+### D47. Column detection, revisited for OCR (refines D42)
+OCR gives one item per word, where a text layer gives a few per line, which broke gutter detection on scans:
+- **Crossing is counted in text rows**, not items (baselines bucketed to half an em), and the limit is 15% of rows (was 5% of items). Measured: gutters were crossed by 4-7% of rows (headings, diagram labels), column interiors by 25-90%.
+- **Minimum gutter 0.6 em** (was 1): OCR word boxes are tight around the ink, and OCR's estimated body size runs large.
+- **Running-text share ≥30%** (was 40%): OCR'd columns beside diagrams have more short label lines.
+- **List markers hanging into a gutter** ("(2)", "(3)") belong to the column on their right; other items in a gutter go to the side their centre is on, and only an item crossing a whole gutter spans columns.
+- **Regression check:** on every text-layer PDF the same pages are detected as before (IEEE pp. 1-4 and 12, AIMA bibliography pp. 1085-1118, nothing elsewhere). Selina: 17 of 18 OCR'd pages are read as two columns; the chapter opening page keeps its warning.
+
+### D48. OCR rendering uses pdf.js's "print" intent
+The default "display" intent paces rendering with requestAnimationFrame, which never fires while the panel is hidden, so OCR stalled until the panel was shown again. "print" renders in one pass.
+
+### D49. A realistic scanned fixture (closes D6)
+D6's blocky 5x7 shapes OCR poorly ("THE CELL HALL GIVES" for "THE CELL WALL GIVES PLANTS"), as predicted. `scanned.pdf` is page 1 of running-headers.pdf rendered at 200 DPI with pdf.js and embedded as an image only. OCR reads it word-perfectly, including hyphen repair across lines; it is regenerated deterministically (same MD5 on every run) and drives an end-to-end OCR test (~5 s). `no-text-layer.pdf` stays as the "no text at all" fixture.

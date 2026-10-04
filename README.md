@@ -2,7 +2,7 @@
 
 A Chrome extension that converts PDFs into clean, compact Markdown **locally in your browser**. Keep only the part you need (a chapter, a page range, or the sections relevant to your question), see a before/after token estimate, and paste the result into Claude, ChatGPT or another AI chat.
 
-> **Status: Phase 2 done.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed. See [Roadmap](#roadmap).
+> **Status: Phase 4 done.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed, and reads scanned pages with on-device OCR. See [Roadmap](#roadmap).
 
 ## Why
 
@@ -23,8 +23,11 @@ Compared with copy-pasting the raw text, the output is 6-14% smaller for books a
 ## Privacy
 
 - PDFs are processed entirely inside the extension. **Document content is never uploaded anywhere.**
-- The extension makes no network requests today. pdf.js, its worker and its character maps are bundled inside the extension.
-- Optional later features (question-aware trimming, OCR) will download **model weights / OCR language data only** (data, not code). This happens on first use, only when you turn the feature on, with pinned versions and a visible progress bar. Downloaded data is cached locally. This section will list the exact files and sources when those phases land.
+- The extension makes **no network requests**. Everything it uses is bundled inside it:
+  - pdf.js, its worker, character maps, standard fonts and image decoders;
+  - the cl100k tokenizer;
+  - OCR: tesseract.js 7.0.0, its WebAssembly engine and the English model (`eng` 4.0.0_best_int).
+- OCR runs only when you press **Run OCR**, on this computer.
 
 ## Install (unpacked, for development)
 
@@ -48,7 +51,8 @@ For live reload while developing: `npm run dev` (WXT opens a Chrome instance wit
 2. Drop a PDF on the panel (or click to choose one). The panel shows its title and page count, and measures the whole document's text in the background.
 3. Optionally tick chapters in the **Chapters** list (shown when the PDF has bookmarks or clear chapter headings), or type pages, e.g. `45-70, 82`, `100-` (to the end), or leave it empty for all pages.
 4. Click **Convert**. A progress bar shows "Reading page X of Y"; **Cancel** stops it.
-5. Check the Markdown preview (you can edit it), then **Copy** or **Download .md** and paste it into your AI chat.
+5. If some pages are scanned images, a **Run OCR on pages … (~time)** button appears. Press it to read them on this computer (about 6-8 s per page; **Cancel** keeps the pages finished so far).
+6. Check the Markdown preview (you can edit it), then **Copy** or **Download .md** and paste it into your AI chat.
 
 The stats bar shows `~before → ~after tokens (est.)`:
 - **Before** is a **rough** estimate of uploading the pages you selected as a PDF: their text plus about 1,568 tokens per page image, because AI apps also send each page as an image. Phase 6 will replace this with measured numbers. **After** is the Markdown. This is the choice you are making: upload the PDF, or paste the Markdown.
@@ -60,6 +64,7 @@ From the command line, the same pipeline runs in Node:
 
 ```bash
 npm run convert -- tests/fixtures/local/book.pdf "45-70" --out chapter.md
+npm run convert -- tests/fixtures/local/scan.pdf "" --ocr   # OCR scanned pages
 ```
 
 ## Scripts
@@ -100,7 +105,7 @@ Each step is pure TypeScript in `src/core/`, unit tested in Node. Steps marked *
 5. **Chapters** (`outline/`): from the PDF's bookmarks, or, without bookmarks, from large headings found during the whole-document count. Ticking chapters fills in the page range.
 6. **Markdown** (`markdown/`): a source line, optional `<!-- page N -->` markers, headings and paragraphs, with blank lines collapsed.
 7. **Tokens** (`tokens/`): counted with the bundled cl100k tokenizer; the PDF-upload estimate adds ~1,568 tokens per page image.
-8. **Trim** to a question (local embeddings) and **OCR** for scanned pages *(later)*.
+8. **OCR** (`ocr/`, on request): scanned pages are rendered at 300 DPI and read with tesseract.js. Each word's position becomes a text item, so OCR'd pages go through steps 2-7 like any other page (columns, headers, lists, tables). Words OCR is less than 60% sure of are dropped.
 
 ## Project layout
 
@@ -124,7 +129,7 @@ Current:
 - **Math** comes out as flattened text (e.g. `J(θ) = (hθ(x(i)) − y(i))2`).
 - **Footnotes** stay where they are printed, as plain paragraphs.
 - **Code blocks** (monospace text) are merged into paragraphs, losing their line breaks.
-- **Scanned pages** (no text layer) are skipped with a warning. OCR is Phase 4.
+- **OCR** reads English only, takes ~6-8 s per page, and is weakest on formulas and diagram labels (e.g. "0.3 m" can come out as "03m"). OCR'd pages are marked with a warning. Bold text is not detected on OCR'd pages.
 - **Page markers** are exact for where a paragraph starts, but a paragraph that runs onto the next page is kept whole before the next page's marker.
 - **Token numbers** are estimates: text is counted with GPT-4's cl100k tokenizer (Claude's is not public), and raw uploads use a rough per-page image cost.
 - **Converting a whole large book** extracts every page (Pro Git, 501 pages, takes about 12 s). Selecting pages is much faster.
@@ -136,8 +141,8 @@ Known non-goals: perfect table and math reconstruction, understanding images/dia
 - [x] Phase 0: setup
 - [x] Phase 1: PDF to clean Markdown (MVP)
 - [x] Phase 2: chapters and structure quality
-- [ ] Phase 3: question-aware trimming
-- [ ] Phase 4: OCR fallback
+- ~~Phase 3: question-aware trimming~~ (dropped: not worth the complexity for this tool)
+- [x] Phase 4: OCR for scanned pages
 - [ ] Phase 5: insert into Claude / ChatGPT
 - [ ] Phase 6: evaluation with exact token counts
 

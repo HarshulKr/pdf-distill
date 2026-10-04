@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { convertFixture, openFixture } from '../scripts/lib/node-pdf';
+import { convertFixture, convertPdf, FIXTURES, openFixture } from '../scripts/lib/node-pdf';
 import { countDocumentText } from '../src/core/extract/extract';
 import { sectionsFromHeadings, sectionsFromOutline } from '../src/core/outline/outline';
 
@@ -167,5 +167,23 @@ describe('chapters', () => {
     } finally {
       await close();
     }
+  });
+});
+
+describe('scanned.pdf (OCR)', () => {
+  it('reports the page as scanned, then reads it with OCR through the normal pipeline', { timeout: 60_000 }, async () => {
+    const before = await convertPdf(join(FIXTURES, 'scanned.pdf'));
+    expect(before.scannedPages).toEqual([1]);
+    expect(before.markdown).not.toContain('phospholipids');
+
+    const { markdown, warnings, scannedPages } = await convertPdf(join(FIXTURES, 'scanned.pdf'), '', { pageMarkers: false }, { ocr: true });
+    expect(scannedPages).toEqual([]);
+    expect(warnings).toEqual([expect.stringMatching(/^Page 1 was read with OCR/)]);
+    expect(markdown).toContain('# 2.1 The Cell Membrane');
+    // Hyphenation repair works on OCR text too ("phospho-/lipids", "water-/fearing").
+    expect(markdown).toContain(
+      'The membrane is built mainly from phospholipids, molecules with a water-loving head and two water-fearing tails.',
+    );
+    expect(markdown).not.toMatch(/Page \d/); // the page-number footer is removed
   });
 });

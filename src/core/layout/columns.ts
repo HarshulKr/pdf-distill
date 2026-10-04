@@ -18,17 +18,19 @@ import type { Line, PageContent, PageLines, TextItem } from '../types';
 /** Gutters must lie within this central part of the page width (excludes margins). */
 const GUTTER_SEARCH = [0.15, 0.85] as const;
 /** ...and be at least this many ems wide. */
-const MIN_GUTTER_EMS = 1;
-/** At most this fraction of body items may cross a gutter (a full-width title, a wide equation). */
-const MAX_CROSSING = 0.05;
+const MIN_GUTTER_EMS = 0.6;
+/** At most this fraction of body text rows may cross a gutter (a full-width title, a wide equation). */
+const MAX_CROSSING = 0.15;
 /** At most this many columns. */
 const MAX_COLUMNS = 4;
+/** List markers that may hang into a gutter: "(3)", "3.", "(iv)", "a)", a bullet. */
+const LIST_MARKER_RE = /^(?:\(?[0-9a-z]{1,4}[.)]|[•●▪◦–-])$/i;
 /** Each column must hold at least this many prose lines... */
 const MIN_COLUMN_LINES = 5;
 /** ...where a prose line fills at least this fraction of its column. */
 const PROSE_LINE_FILL = 0.6;
 /** ...and such lines must be at least this share of the column's lines. */
-const MIN_PROSE_SHARE = 0.4;
+const MIN_PROSE_SHARE = 0.3;
 /** A text line is at least this share letters... */
 const TEXT_LETTER_SHARE = 0.6;
 /** ...with at least this many letters per word on average ("Z VR W VR" has fewer). */
@@ -64,13 +66,18 @@ export function findGutters(page: PageContent): [number, number][] {
   const from = Math.max(Math.floor(GUTTER_SEARCH[0] * page.width), Math.ceil(textLeft) + 1);
   const to = Math.min(Math.ceil(GUTTER_SEARCH[1] * page.width), Math.floor(textRight) - 1);
   if (to <= from) return [];
-  const coverage = new Array<number>(to - from + 1).fill(0);
+  // Coverage counts text *rows* (baselines bucketed to half an em), not
+  // items: a text layer has a few items per line, OCR has one per word, and
+  // the crossing limit must mean the same thing for both.
+  const rowOf = (item: TextItem): number => Math.round(item.y / (0.5 * bodySize));
+  const rowsAt = Array.from({ length: to - from + 1 }, () => new Set<number>());
   for (const item of body) {
     const a = Math.max(from, Math.floor(item.x));
     const b = Math.min(to, Math.ceil(item.x + item.width));
-    for (let x = a; x <= b; x++) coverage[x - from] = (coverage[x - from] ?? 0) + 1;
+    for (let x = a; x <= b; x++) rowsAt[x - from]?.add(rowOf(item));
   }
-  const limit = MAX_CROSSING * body.length;
+  const coverage = rowsAt.map((rows) => rows.size);
+  const limit = MAX_CROSSING * new Set(body.map(rowOf)).size;
   const gutters: [number, number][] = [];
   let start: number | null = null;
   for (let k = 0; k <= coverage.length; k++) {
@@ -141,11 +148,21 @@ export function pageToColumnLines(page: PageContent): PageLines & { columns: num
   const columnItems: TextItem[][] = cuts.map(() => []).concat([[]]);
   const spanning: TextItem[] = [];
   for (const item of page.items) {
-    const first = cuts.findIndex((c) => item.x < c);
-    const col = first === -1 ? cuts.length : first;
-    const crosses = col < cuts.length && item.x + item.width > (cuts[col] ?? Infinity);
-    if (crosses) spanning.push(item);
-    else columnItems[col]?.push(item);
+    // Spanning means crossing a whole gutter (a title, a wide figure). Items
+    // that only reach into a gutter, like "(2)" list numbers hanging left
+    // of a column, belong to the column their centre is on.
+    const spans = gutters.some(([a, b]) => item.x < a && item.x + item.width > b);
+    if (spans) {
+      spanning.push(item);
+      continue;
+    }
+    const centre = item.x + item.width / 2;
+    let col = cuts.findIndex((c) => centre < c);
+    if (col === -1) col = cuts.length;
+    // A list marker inside a gutter labels the text after it: the column to its right.
+    const inGutter = gutters.findIndex(([a, b]) => centre >= a && centre <= b);
+    if (inGutter !== -1 && LIST_MARKER_RE.test(item.str.trim())) col = inGutter + 1;
+    columnItems[col]?.push(item);
   }
 
   const columns = columnItems.map((items) => groupLines(items));

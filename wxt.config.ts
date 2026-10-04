@@ -5,6 +5,9 @@ import { defineConfig } from 'wxt';
 
 const require = createRequire(import.meta.url);
 const pdfjsRoot = dirname(require.resolve('pdfjs-dist/package.json'));
+const tesseractRoot = dirname(require.resolve('tesseract.js/package.json'));
+const tesseractCoreRoot = dirname(require.resolve('tesseract.js-core/package.json'));
+const engDataRoot = dirname(require.resolve('@tesseract.js-data/eng/package.json'));
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -19,21 +22,41 @@ export default defineConfig({
     action: {
       default_title: 'Open PDF Distill',
     },
-    // 'wasm-unsafe-eval' is needed later for WASM (OCR, embeddings). It allows
-    // compiling bundled .wasm files only; it does not allow eval() of JS.
+    // 'wasm-unsafe-eval' lets the bundled .wasm files (OCR, pdf.js image
+    // decoders) be compiled. It does not allow eval() of JS.
     content_security_policy: {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
     },
   },
   hooks: {
-    // Bundle pdf.js character maps (~1.7 MB). Some PDFs, notably CJK ones,
-    // use predefined CMaps; without them pdf.js cannot map glyphs to text.
-    // MV3 forbids loading them from a CDN, so they ship inside the extension.
+    // Everything is bundled: MV3 forbids loading code from a CDN, and the
+    // extension makes no network requests (see README, Privacy).
     'build:publicAssets': (_wxt, files) => {
-      const cmapDir = join(pdfjsRoot, 'cmaps');
-      for (const name of readdirSync(cmapDir)) {
-        files.push({ absoluteSrc: join(cmapDir, name), relativeDest: `pdfjs/cmaps/${name}` });
+      const copy = (from: string, to: string): void => {
+        files.push({ absoluteSrc: from, relativeDest: to });
+      };
+      const copyDir = (dir: string, to: string, keep: (name: string) => boolean = () => true): void => {
+        for (const name of readdirSync(dir).filter(keep)) copy(join(dir, name), `${to}/${name}`);
+      };
+
+      // pdf.js character maps (~1.7 MB): without them some PDFs, notably CJK
+      // ones, extract as garbage.
+      copyDir(join(pdfjsRoot, 'cmaps'), 'pdfjs/cmaps');
+      // Rendering pages for OCR: standard fonts (~0.8 MB) and the JPEG 2000,
+      // JBIG2 and colour-profile decoders (scans often use these formats).
+      // quickjs-eval (PDF scripting) is not needed.
+      copyDir(join(pdfjsRoot, 'standard_fonts'), 'pdfjs/standard_fonts');
+      copyDir(join(pdfjsRoot, 'wasm'), 'pdfjs/wasm', (n) => /^(jbig2|openjpeg|qcms_bg)\.wasm$/.test(n));
+
+      // OCR (DECISIONS.md D44): the tesseract.js worker, the two SIMD LSTM
+      // engine builds (Chrome 116+ always has SIMD, so the slower fallback is
+      // left out), and the English model.
+      copy(join(tesseractRoot, 'dist', 'worker.min.js'), 'ocr/worker.min.js');
+      copy(join(tesseractRoot, 'dist', 'worker.min.js.LICENSE.txt'), 'ocr/worker.min.js.LICENSE.txt');
+      for (const core of ['tesseract-core-simd-lstm.wasm.js', 'tesseract-core-relaxedsimd-lstm.wasm.js']) {
+        copy(join(tesseractCoreRoot, core), `ocr/core/${core}`);
       }
+      copy(join(engDataRoot, '4.0.0_best_int', 'eng.traineddata.gz'), 'ocr/lang/eng.traineddata.gz');
     },
   },
 });
