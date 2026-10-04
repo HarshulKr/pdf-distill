@@ -204,3 +204,22 @@ TeX math fonts draw large brackets from Private Use Area code points (U+E000-U+F
 - **Paragraphs across columns:** moving up the page used to always start a new paragraph. A sentence cut off at the bottom of a column now continues when the next column starts in lowercase.
 - **Results:** IEEE paper pages 1-4 detected (plus a multi-column committee list), AIMA bibliography (pp. 1085-1118, three columns) reads entry by entry. Zero pages detected in ATLAS, CS229, the two short papers, the slides and the scan; their outputs are byte-identical to before.
 - **Limitation:** index pages (short entries like "A* search, 103") are not recognised as columns and stay interleaved.
+
+### D43. Token counts use the cl100k tokenizer (supersedes the 4-chars rule; updates D34)
+`js-tiktoken` 1.0.21 (MIT, pinned) with the `cl100k_base` vocabulary (GPT-4's) is bundled, about 1.1 MB, taking the built extension from 2.9 to 4.0 MB. Claude's tokenizer is not public, so this is still an approximation, labelled as such in the side panel. Phase 6 measures the gap with Claude's token-counting API.
+- **Why it matters:** "4 characters per token" undercounted the ATLAS paper by ~30% (~50,400 vs ~71,700 tokens) and CS229 by ~14%, because math and physics notation splits into many tokens. For plain prose (AIMA) it was within ~10%.
+- **Cost:** ~0.2 s to build the tokenizer once, then ~1.5-2.5 MB of text per second. Tokenizing every page in the background count adds little: AIMA's 1,166 pages were measured in ~16 s in the browser, about the same as before. Edits in the preview are recounted 250 ms after typing stops.
+- The 4-chars rule stays as a fallback if the tokenizer cannot be built, and for a whole-document count that predates this change (`WholeDocumentCount.tokens` missing).
+- Test counts are pinned to an external reference (OpenAI's cookbook example "tiktoken is great!" = 6 tokens), not to whatever the code returns.
+
+Re-measured (D34), tokens via cl100k:
+
+| | Raw text of pages | Output | PDF upload (rough) |
+|---|---|---|---|
+| AIMA ch. 3, 47 pp. | ~35,000 | ~30,100 | ~108,700 |
+| CS229 ch. 1, 12 pp. | ~5,800 | ~5,750 | ~24,600 |
+| Slides, 22 pp. | ~690 | ~800 | ~35,200 |
+| ATLAS paper, 62 pp. | ~76,800 | ~70,500 | ~174,100 |
+| IEEE two-column paper, 4 pp. | ~5,900 | ~5,500 | ~12,100 |
+
+With real counts the output is 6-14% *smaller* than the raw text for books and papers, level for lecture notes, and 15% larger for slides (list markers on short bullets). The main saving is still against PDF uploads: 55-98%.

@@ -1,9 +1,21 @@
-// Token estimation. All numbers here are ESTIMATES, never exact Claude counts.
+// Token counts. All numbers here are ESTIMATES, never exact Claude counts.
+//
+// Text is counted with the cl100k_base tokenizer (GPT-4's), bundled with the
+// extension. Claude's tokenizer is not public, so this is an approximation;
+// it is much closer than a characters-per-token rule, which undercounted
+// math-heavy text by ~30% (DECISIONS.md D43). Phase 6 measures the
+// difference against Claude's token-counting API.
+
+import { Tiktoken } from 'js-tiktoken/lite';
+import cl100k from 'js-tiktoken/ranks/cl100k_base';
+
+/** Shown next to counts so users know what they are looking at. */
+export const TOKENIZER_NAME = 'cl100k';
 
 /**
- * Rough rule of thumb for English text: ~4 characters per token. Phase 2
- * replaces this with js-tiktoken (cl100k) as a closer approximation and keeps
- * this as the fallback.
+ * Fallback rule of thumb for English text: ~4 characters per token. Used
+ * only if the tokenizer fails to load, and for quick sizes of text that was
+ * not kept (none today).
  */
 export const CHARS_PER_TOKEN = 4;
 
@@ -11,8 +23,33 @@ export function estimateTokensFromChars(chars: number): number {
   return Math.ceil(chars / CHARS_PER_TOKEN);
 }
 
-export function estimateTokens(text: string): number {
-  return estimateTokensFromChars(text.length);
+let encoder: Tiktoken | null | undefined;
+
+/** The tokenizer, built on first use (~0.2 s); null if it could not be built. */
+function getEncoder(): Tiktoken | null {
+  if (encoder === undefined) {
+    try {
+      encoder = new Tiktoken(cl100k);
+    } catch {
+      encoder = null;
+    }
+  }
+  return encoder;
+}
+
+/**
+ * Token count of `text`. Special-token strings such as "<|endoftext|>" are
+ * counted as ordinary text: they are document content, not control tokens.
+ */
+export function countTokens(text: string): number {
+  if (text === '') return 0;
+  const enc = getEncoder();
+  if (!enc) return estimateTokensFromChars(text.length);
+  try {
+    return enc.encode(text, [], []).length;
+  } catch {
+    return estimateTokensFromChars(text.length);
+  }
 }
 
 /**

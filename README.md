@@ -2,21 +2,23 @@
 
 A Chrome extension that converts PDFs into clean, compact Markdown **locally in your browser**. Keep only the part you need (a chapter, a page range, or the sections relevant to your question), see a before/after token estimate, and paste the result into Claude, ChatGPT or another AI chat.
 
-> **Status: Phase 2 in progress.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed. See [Roadmap](#roadmap).
+> **Status: Phase 2 done.** Converts a PDF, a page range or chosen chapters to clean Markdown with headers, footers and page numbers removed. See [Roadmap](#roadmap).
 
 ## Why
 
 Uploading a whole PDF to an AI assistant is expensive. Many assistants process every page as an image plus its text, so a 40-page chapter can cost tens of thousands of tokens even if you only need 5 pages. Sending clean Markdown of just the relevant part uses a fraction of that, which stretches your usage limits further.
 
-Measured on real PDFs (estimates; see [DECISIONS.md](DECISIONS.md) D34):
+Measured on real PDFs (token counts with the cl100k tokenizer; see [DECISIONS.md](DECISIONS.md) D43):
 
 | | PDF upload (rough) | PDF Distill output |
 | --- | --- | --- |
-| Textbook chapter (AIMA ch. 3, 47 pages) | ~107,600 tokens | ~32,800 tokens |
-| Lecture notes (CS229 ch. 1, 12 pages) | ~23,500 tokens | ~5,000 tokens |
-| Slide deck (22 slides) | ~35,200 tokens | ~840 tokens |
+| Textbook chapter (AIMA ch. 3, 47 pages) | ~108,700 tokens | ~30,100 tokens |
+| Research paper (ATLAS, 62 pages, 11 tables) | ~174,100 tokens | ~70,500 tokens |
+| Two-column paper (IEEE, 4 pages) | ~12,100 tokens | ~5,500 tokens |
+| Lecture notes (CS229 ch. 1, 12 pages) | ~24,600 tokens | ~5,750 tokens |
+| Slide deck (22 slides) | ~35,200 tokens | ~800 tokens |
 
-Compared with copy-pasting the raw text, the output costs about the same, but it is clean: running headers, page numbers, margin notes and figure labels are removed, and headings, paragraphs and lists are restored.
+Compared with copy-pasting the raw text, the output is 6-14% smaller for books and papers and about the same for notes and slides, and it is clean: running headers, page numbers, margin notes and figure labels are removed, columns are put in reading order, and headings, paragraphs, lists and tables are restored.
 
 ## Privacy
 
@@ -52,7 +54,7 @@ The stats bar shows `~before → ~after tokens (est.)`:
 - **Before** is a **rough** estimate of uploading the pages you selected as a PDF: their text plus about 1,568 tokens per page image, because AI apps also send each page as an image. Phase 6 will replace this with measured numbers. **After** is the Markdown. This is the choice you are making: upload the PDF, or paste the Markdown.
 - Underneath is the raw text of the same pages. The Markdown usually costs about the same as that raw text: cleaning removes junk, and headings, lists and page markers add a little back. The difference is that the Markdown is clean and structured.
 - For context, the same numbers are shown for the whole document.
-- All numbers are estimates (about 4 characters per token for now), not exact Claude counts.
+- Text is counted with the cl100k tokenizer (GPT-4's). Claude's tokenizer is not public, so these are close estimates, not exact Claude counts; Phase 6 measures the difference.
 
 From the command line, the same pipeline runs in Node:
 
@@ -97,7 +99,7 @@ Each step is pure TypeScript in `src/core/`, unit tested in Node. Steps marked *
    - Tables: lines whose text sits in aligned cells become Markdown tables. Plots, matrices and equations, which also line up in columns, are told apart and left as text.
 5. **Chapters** (`outline/`): from the PDF's bookmarks, or, without bookmarks, from large headings found during the whole-document count. Ticking chapters fills in the page range.
 6. **Markdown** (`markdown/`): a source line, optional `<!-- page N -->` markers, headings and paragraphs, with blank lines collapsed.
-7. **Tokens** (`tokens/`): before/after estimates.
+7. **Tokens** (`tokens/`): counted with the bundled cl100k tokenizer; the PDF-upload estimate adds ~1,568 tokens per page image.
 8. **Trim** to a question (local embeddings) and **OCR** for scanned pages *(later)*.
 
 ## Project layout
@@ -124,7 +126,7 @@ Current:
 - **Code blocks** (monospace text) are merged into paragraphs, losing their line breaks.
 - **Scanned pages** (no text layer) are skipped with a warning. OCR is Phase 4.
 - **Page markers** are exact for where a paragraph starts, but a paragraph that runs onto the next page is kept whole before the next page's marker.
-- **Token numbers** are estimates: about 4 characters per token, and a rough per-page image cost for raw uploads.
+- **Token numbers** are estimates: text is counted with GPT-4's cl100k tokenizer (Claude's is not public), and raw uploads use a rough per-page image cost.
 - **Converting a whole large book** extracts every page (Pro Git, 501 pages, takes about 12 s). Selecting pages is much faster.
 
 Known non-goals: perfect table and math reconstruction, understanding images/diagrams, Firefox/Safari.
@@ -133,7 +135,7 @@ Known non-goals: perfect table and math reconstruction, understanding images/dia
 
 - [x] Phase 0: setup
 - [x] Phase 1: PDF to clean Markdown (MVP)
-- [ ] Phase 2: chapters and structure quality
+- [x] Phase 2: chapters and structure quality
 - [ ] Phase 3: question-aware trimming
 - [ ] Phase 4: OCR fallback
 - [ ] Phase 5: insert into Claude / ChatGPT

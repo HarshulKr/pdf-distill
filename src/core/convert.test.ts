@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { beforeStats, convert, pagesLabel, removedSummary } from './convert';
 import { bodyLines, item, page } from './testing';
+import { countTokens } from './tokens/estimate';
 import type { PageContent } from './types';
 
 /** A book page with a running header, a page-number footer and body text. */
@@ -32,9 +33,16 @@ describe('convert', () => {
       options: { pageMarkers: false },
       wholeDocument: { pages: 10, chars: 4000 },
     });
+    // No token count yet: falls back to ~4 characters per token.
     expect(result.stats.tokensBefore).toBe(1000);
     expect(result.stats.rawUploadTokensBefore).toBe(1000 + 10 * 1568);
-    expect(result.stats.tokensAfter).toBe(Math.ceil(result.markdown.length / 4));
+    expect(result.stats.tokensAfter).toBe(countTokens(result.markdown));
+  });
+
+  it('uses the whole-document token count when the background count provides one', () => {
+    const result = convert({ pages, selected: [1], options: { pageMarkers: false }, wholeDocument: { pages: 10, chars: 4000, tokens: 870 } });
+    expect(result.stats.tokensBefore).toBe(870);
+    expect(result.stats.rawUploadTokensBefore).toBe(870 + 10 * 1568);
   });
 
   it('measures the selected pages raw, so "before" is like-for-like with "after"', () => {
@@ -42,7 +50,9 @@ describe('convert', () => {
     // Per page: header (23) + body (50) + footer (1) chars, plus 3 newlines.
     const perPage = 'INTRODUCTION TO BIOLOGY'.length + 'Text of page 2 goes here and is plain body text.'.length + 1 + 3;
     expect(result.stats.charsSelected).toBe(2 * perPage);
-    expect(result.stats.tokensSelected).toBe(Math.ceil((2 * perPage) / 4));
+    expect(result.stats.tokensSelected).toBe(
+      countTokens(['INTRODUCTION TO BIOLOGY', 'Text of page 2 goes here and is plain body text.', '2', 'INTRODUCTION TO BIOLOGY', 'Text of page 3 goes here and is plain body text.', '3'].join(String.fromCharCode(10))),
+    );
     expect(result.stats.rawUploadTokensSelected).toBe(result.stats.tokensSelected + 2 * 1568);
     expect(result.stats.tokensAfter).toBeLessThan(result.stats.tokensSelected);
   });

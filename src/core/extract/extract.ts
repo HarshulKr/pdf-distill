@@ -6,6 +6,7 @@
 // Node tests.
 
 import type { HeadingCandidate } from '../outline/outline';
+import { countTokens } from '../tokens/estimate';
 import type { PageContent, TextItem } from '../types';
 
 export interface PdfTextItemLike {
@@ -222,6 +223,8 @@ export interface DocumentTextCount {
   chars: number;
   /** Pages with (almost) no text layer: OCR candidates. */
   lowTextPages: number[];
+  /** Token count of the raw text (see tokens/estimate.ts). */
+  tokens: number;
   /** Most common font size in the document, weighted by characters. */
   bodySize: number;
   /** Large text runs, for finding chapters in PDFs without bookmarks. */
@@ -292,6 +295,7 @@ export function pageHeadingCandidates(items: PdfTextItemLike[], page: number): H
  */
 export async function countDocumentText(doc: PdfDocumentLike, options: RunOptions = {}): Promise<DocumentTextCount> {
   let chars = 0;
+  let tokens = 0;
   const lowTextPages: number[] = [];
   const sizeChars = new Map<number, number>();
   const headingCandidates: HeadingCandidate[] = [];
@@ -308,6 +312,7 @@ export async function countDocumentText(doc: PdfDocumentLike, options: RunOption
         sizeChars.set(size, (sizeChars.get(size) ?? 0) + item.str.length);
       }
       chars += pageChars;
+      tokens += countTokens(items.map((i) => i.str + (i.hasEOL ? '\n' : '')).join(''));
       if (pageChars < LOW_TEXT_CHARS) lowTextPages.push(p);
       else headingCandidates.push(...pageHeadingCandidates(items, p));
     } finally {
@@ -324,5 +329,5 @@ export async function countDocumentText(doc: PdfDocumentLike, options: RunOption
       best = w;
     }
   }
-  return { pages: doc.numPages, chars, lowTextPages, bodySize, headingCandidates };
+  return { pages: doc.numPages, chars, tokens, lowTextPages, bodySize, headingCandidates };
 }

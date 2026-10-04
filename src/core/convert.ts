@@ -14,7 +14,7 @@ import { sectionsInSelection } from './outline/outline';
 import { formatPageList } from './pages/range';
 import { buildBlocks, buildProfile } from './structure/structure';
 import { extractTables } from './structure/tables';
-import { estimateRawPdfUploadTokens, estimateTokens, estimateTokensFromChars } from './tokens/estimate';
+import { countTokens, estimateRawPdfUploadTokens, estimateTokensFromChars } from './tokens/estimate';
 import type { ConversionResult, ConversionStats, PageContent, PageLines, Section, TableBlock } from './types';
 
 export interface ConvertOptions {
@@ -24,6 +24,8 @@ export interface ConvertOptions {
 export interface WholeDocumentCount {
   pages: number;
   chars: number;
+  /** Token count of the whole document's text; estimated from chars if absent. */
+  tokens?: number;
 }
 
 export interface ConvertInput {
@@ -74,7 +76,7 @@ export function beforeStats(whole: WholeDocumentCount | null | undefined): {
   rawUploadTokensBefore: number | null;
 } {
   if (!whole) return { charsBefore: null, tokensBefore: null, rawUploadTokensBefore: null };
-  const tokensBefore = estimateTokensFromChars(whole.chars);
+  const tokensBefore = whole.tokens ?? estimateTokensFromChars(whole.chars);
   return {
     charsBefore: whole.chars,
     tokensBefore,
@@ -95,6 +97,11 @@ export function rawTextChars(pages: PageLines[]): number {
     }
   }
   return chars;
+}
+
+/** Raw extracted text, one line per text line, before any cleaning (for the "before" token count). */
+export function rawText(pages: PageLines[]): string {
+  return pages.map((p) => p.lines.map((l) => l.text).join('\n')).join('\n');
 }
 
 export function convert(input: ConvertInput): ConversionResult {
@@ -159,7 +166,7 @@ export function convert(input: ConvertInput): ConversionResult {
 
   // Raw = as extracted, margin notes included.
   const charsSelected = rawTextChars(input.pages.filter(isSelected).map(pageToLines));
-  const tokensSelected = estimateTokensFromChars(charsSelected);
+  const tokensSelected = countTokens(rawText(input.pages.filter(isSelected).map(pageToLines)));
 
   return {
     markdown,
@@ -171,7 +178,7 @@ export function convert(input: ConvertInput): ConversionResult {
       rawUploadTokensSelected: estimateRawPdfUploadTokens(tokensSelected, input.selected.length),
       ...beforeStats(input.wholeDocument),
       charsAfter: markdown.length,
-      tokensAfter: estimateTokens(markdown),
+      tokensAfter: countTokens(markdown),
       removedLines: headers.removed,
       removedMarginNotes: marginNotes,
       removedFigureLines: figures.removed,

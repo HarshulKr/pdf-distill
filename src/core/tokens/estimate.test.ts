@@ -1,17 +1,35 @@
 import { describe, expect, it } from 'vitest';
 import {
+  countTokens,
   estimateRawPdfUploadTokens,
-  estimateTokens,
   estimateTokensFromChars,
   formatTokenEstimate,
   RAW_PDF_IMAGE_TOKENS_PER_PAGE,
 } from './estimate';
 
-describe('token estimates', () => {
-  it('uses ~4 characters per token, rounded up', () => {
-    expect(estimateTokens('')).toBe(0);
-    expect(estimateTokens('abcde')).toBe(2);
+describe('countTokens (cl100k)', () => {
+  it('counts known strings exactly', () => {
+    expect(countTokens('')).toBe(0);
+    expect(countTokens('hello world')).toBe(2);
+    // The example in OpenAI's tiktoken cookbook: 6 tokens in cl100k_base.
+    expect(countTokens('tiktoken is great!')).toBe(6);
+  });
+
+  it('counts math-heavy text as more tokens than the 4-chars rule', () => {
+    // From the ATLAS paper: symbols and indices split into many tokens.
+    const physics = '𝑍(ℓℓ)+jets 13/13.6 Sherpa 2.2.14 NNLO 𝐸Tmiss > 150 GeV, |𝜂| < 2.47';
+    expect(countTokens(physics)).toBeGreaterThan(estimateTokensFromChars(physics.length));
+  });
+
+  it('treats special-token text as ordinary content', () => {
+    expect(countTokens('a <|endoftext|> b')).toBeGreaterThan(3);
+  });
+});
+
+describe('estimates', () => {
+  it('keeps ~4 characters per token as the fallback', () => {
     expect(estimateTokensFromChars(400)).toBe(100);
+    expect(estimateTokensFromChars(5)).toBe(2);
   });
 
   it('raw PDF upload = text tokens + one image per page', () => {

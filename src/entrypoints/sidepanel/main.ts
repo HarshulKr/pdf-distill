@@ -7,7 +7,7 @@ import { CancelledError, countDocumentText, extractPages } from '@/core/extract/
 import { markdownFileName } from '@/core/markdown/render';
 import { pagesOfSections, sectionsFromHeadings, sectionsFromOutline } from '@/core/outline/outline';
 import { formatPageList, parsePageRange, samplePages } from '@/core/pages/range';
-import { estimateTokens, formatTokenEstimate, RAW_PDF_IMAGE_TOKENS_PER_PAGE } from '@/core/tokens/estimate';
+import { countTokens, formatTokenEstimate, RAW_PDF_IMAGE_TOKENS_PER_PAGE, TOKENIZER_NAME } from '@/core/tokens/estimate';
 import type { ConversionResult, Section } from '@/core/types';
 import { loadPdf, PdfLoadError, type LoadedPdf } from '@/lib/pdf';
 import { loadSettings, saveSettings, type Settings } from '@/lib/settings';
@@ -326,14 +326,15 @@ function renderStats(): void {
   const result = state.result;
   if (!result) return;
   const { stats } = result;
-  const after = estimateTokens(ui.preview.value);
+  // Only re-tokenize when the user has edited the preview.
+  const after = ui.preview.value === result.markdown ? stats.tokensAfter : countTokens(ui.preview.value);
   ui.tokensBefore.textContent = formatTokenEstimate(stats.rawUploadTokensSelected);
   ui.tokensAfter.textContent = formatTokenEstimate(after);
 
   const pages = `${stats.pages.toLocaleString()} ${stats.pages === 1 ? 'page' : 'pages'}`;
   const perImage = `~${RAW_PDF_IMAGE_TOKENS_PER_PAGE.toLocaleString('en-US')} per page image`;
   const parts: string[] = [
-    `PDF upload estimate = text + ${perImage}.`,
+    `Text counted with the ${TOKENIZER_NAME} tokenizer (GPT-4's; Claude's is not public and differs somewhat). PDF upload estimate = text + ${perImage}.`,
     `Raw text of these ${pages}: ${formatTokenEstimate(stats.tokensSelected)}. Removed: ${removedSummary(stats)}.`,
   ];
   const whole = beforeStats(state.whole);
@@ -430,7 +431,12 @@ ui.pageMarkers.addEventListener('change', () => {
   state.settings.pageMarkers = ui.pageMarkers.checked;
   void saveSettings(state.settings);
 });
-ui.preview.addEventListener('input', renderStats);
+// Tokenizing a long chapter takes ~0.1 s, so recount once typing pauses.
+let statsTimer: ReturnType<typeof setTimeout> | undefined;
+ui.preview.addEventListener('input', () => {
+  clearTimeout(statsTimer);
+  statsTimer = setTimeout(renderStats, 250);
+});
 ui.copy.addEventListener('click', () => void copyMarkdown());
 ui.download.addEventListener('click', downloadMarkdown);
 
